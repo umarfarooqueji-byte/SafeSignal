@@ -33,8 +33,9 @@ class MainActivity : FlutterActivity() {
         )
 
         for (pkg in installedApps) {
+            val appInfo = pkg.applicationInfo ?: continue
             // Skip pure system apps without launcher icon
-            val isSystem = (pkg.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+            val isSystem = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
             val hasLauncher = pm.getLaunchIntentForPackage(pkg.packageName) != null
 
             // Include user apps + system apps that are launchable
@@ -42,7 +43,7 @@ class MainActivity : FlutterActivity() {
             if (pkg.packageName in systemSkip) continue
 
             val permissions = pkg.requestedPermissions?.toList() ?: emptyList()
-            val appName = pm.getApplicationLabel(pkg.applicationInfo).toString()
+            val appName = pm.getApplicationLabel(appInfo).toString()
 
             apps.add(
                 mapOf(
