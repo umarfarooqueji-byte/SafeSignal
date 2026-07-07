@@ -1,32 +1,59 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/theme/app_theme.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../../core/widgets/arc_gauge.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  static const _channel = MethodChannel('com.safesignal/app_scanner');
+
+  @override
+  void initState() {
+    super.initState();
+    _requestAllPermissions();
+  }
+
+  Future<void> _requestAllPermissions() async {
+    // Request SMS, Phone, and Notification permissions
+    final statuses = await [
+      Permission.sms,
+      Permission.phone,
+      Permission.notification,
+    ].request();
+
+    // Check if we need to request Overlay permission (for call screening)
+    if (statuses[Permission.phone]?.isGranted == true) {
+      try {
+        await _channel.invokeMethod('requestOverlayPermission');
+      } catch (_) {}
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF06090F) : const Color(0xFFF0F4FF);
 
     return Scaffold(
-      backgroundColor:
-          isDark ? AppTheme.darkBg : AppTheme.lightBg,
+      backgroundColor: bg,
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTopBar(context, isDark),
-              _buildScoreCard(context, isDark),
-              _buildSectionTitle('🔧 Security Tools', context),
-              _buildToolsGrid(context, isDark),
-              _buildSectionTitle('📊 Aaj Ki Activity', context),
-              _buildStatsRow(context, isDark),
-              _buildSectionTitle('💡 Safety Tip', context),
-              _buildTipCard(context, isDark),
+              _TopBar(isDark: isDark),
+              _ScoreSection(isDark: isDark),
+              _QuickTilesSection(isDark: isDark),
+              _TipCard(isDark: isDark),
               const SizedBox(height: 32),
             ],
           ),
@@ -34,10 +61,17 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildTopBar(BuildContext context, bool isDark) {
+// ─── Top Bar ─────────────────────────────────────────────────────────────────
+class _TopBar extends StatelessWidget {
+  final bool isDark;
+  const _TopBar({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+      padding: const EdgeInsets.fromLTRB(22, 18, 22, 0),
       child: Row(
         children: [
           Column(
@@ -48,317 +82,380 @@ class HomeScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   color: isDark ? Colors.white54 : Colors.black45,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 'SafeSignal',
                 style: TextStyle(
-                  fontSize: 28,
+                  fontSize: 26,
                   fontWeight: FontWeight.w900,
-                  color: isDark ? Colors.white : AppTheme.darkSurface,
+                  color: isDark ? Colors.white : const Color(0xFF0D1117),
                   letterSpacing: -0.5,
                 ),
               ),
             ],
           ),
           const Spacer(),
+          // Notification bell
           Container(
-            width: 46,
-            height: 46,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              gradient: AppTheme.primaryGrad,
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primary.withValues(alpha: 0.35),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              color: isDark ? const Color(0xFF161B27) : Colors.white,
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(
+                color: isDark ? const Color(0xFF30363D) : const Color(0xFFE0E7FF),
+              ),
             ),
-            child: const Icon(Icons.shield_outlined, color: Colors.white, size: 24),
+            child: Icon(
+              Icons.notifications_outlined,
+              color: isDark ? Colors.white70 : const Color(0xFF2979FF),
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Shield icon
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2979FF), Color(0xFF7C4DFF)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: const Icon(Icons.shield_outlined, color: Colors.white, size: 22),
           ),
         ],
       ),
     ).animate().fadeIn().slideY(begin: -0.1);
   }
+}
 
-  Widget _buildScoreCard(BuildContext context, bool isDark) {
+// ─── Score Section ────────────────────────────────────────────────────────────
+class _ScoreSection extends StatelessWidget {
+  final bool isDark;
+  const _ScoreSection({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
+      padding: const EdgeInsets.fromLTRB(22, 20, 22, 8),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
         decoration: BoxDecoration(
-          gradient: AppTheme.primaryGrad,
-          borderRadius: BorderRadius.circular(24),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1A237E), Color(0xFF283593), Color(0xFF1565C0)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.primary.withValues(alpha: 0.4),
+              color: const Color(0xFF2979FF).withValues(alpha: 0.35),
               blurRadius: 24,
               offset: const Offset(0, 10),
             ),
           ],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Title
             Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.security, color: Colors.white70, size: 13),
-                      SizedBox(width: 4),
-                      Text('Security Score',
-                          style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppTheme.safeGreen.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white24),
-                  ),
-                  child: const Text('ACHHA 👍',
-                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                const Text(
-                  '72',
+                const Icon(Icons.security, color: Colors.white60, size: 15),
+                const SizedBox(width: 6),
+                Text(
+                  'Security Rating',
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 64,
-                    fontWeight: FontWeight.w900,
-                    height: 1,
-                    letterSpacing: -2,
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    letterSpacing: 0.5,
                   ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 10, left: 4),
-                  child: Text('/100',
-                      style: TextStyle(color: Colors.white54, fontSize: 22, fontWeight: FontWeight.w600)),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: LinearProgressIndicator(
-                value: 0.72,
-                minHeight: 8,
-                backgroundColor: Colors.white.withValues(alpha: 0.2),
-                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+            const SizedBox(height: 20),
+            // Circular gauge
+            SizedBox(
+              width: 200,
+              height: 200,
+              child: ArcGauge(
+                value: 4.39,
+                maxValue: 5.0,
+                color: Colors.white,
+                trackColor: Colors.white.withValues(alpha: 0.15),
+                strokeWidth: 14,
+                sweepDegrees: 240,
+                centerChild: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    RichText(
+                      text: const TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '4',
+                            style: TextStyle(
+                              fontSize: 52,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              height: 1,
+                            ),
+                          ),
+                          TextSpan(
+                            text: '.39',
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white70,
+                              height: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'of 5',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.55),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 14),
-            const Text(
-              'App Scanner chalao — score aur badhao!',
-              style: TextStyle(color: Colors.white70, fontSize: 13),
+            const SizedBox(height: 20),
+            // Secure button
+            GestureDetector(
+              onTap: () => GoRouter.of(context).go('/app-scanner'),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF00BCD4), Color(0xFF2979FF)],
+                  ),
+                  borderRadius: BorderRadius.circular(50),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF00BCD4).withValues(alpha: 0.4),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'Apna Phone Secure Karo',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.verified_user, color: Colors.white, size: 18),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
-      ),
-    ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.05);
-  }
-
-  Widget _buildSectionTitle(String title, BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w800,
-          color: isDark ? Colors.white : AppTheme.darkSurface,
-          letterSpacing: -0.2,
-        ),
-      ),
+      ).animate().fadeIn(delay: 80.ms).slideY(begin: 0.05),
     );
   }
+}
 
-  Widget _buildToolsGrid(BuildContext context, bool isDark) {
-    final tools = [
-      _ToolData('🌐', 'URL Scanner', 'Website safe hai ya nahi', const Color(0xFF2979FF), '/url-scanner'),
-      _ToolData('📶', 'WiFi Scanner', 'Network security check', const Color(0xFF00897B), '/wifi-scanner'),
-      _ToolData('📱', 'App Scanner', 'Installed apps security', const Color(0xFF7C4DFF), '/app-scanner'),
-      _ToolData('💬', 'Message Check', 'SMS/WhatsApp analyze', const Color(0xFF00BCD4), '/chat'),
-      _ToolData('📰', 'Scam Alerts', 'Aaj ke fraud news', const Color(0xFFE53935), '/feed'),
-      _ToolData('📋', 'History', 'Past checks dekho', const Color(0xFFFF6F00), '/history'),
+// ─── Quick Tiles Section ──────────────────────────────────────────────────────
+class _QuickTilesSection extends StatelessWidget {
+  final bool isDark;
+  const _QuickTilesSection({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final tiles = [
+      _Tile('QR Scan', Icons.qr_code_scanner, const Color(0xFF2979FF), '/chat', null),
+      _Tile('WiFi Security', Icons.wifi_password, const Color(0xFF00897B), '/wifi-scanner', null),
+      _Tile('Scan Website', Icons.language, const Color(0xFF1565C0), '/url-scanner', null),
+      _Tile('OTP Security', Icons.sms_outlined, const Color(0xFF6A1B9A), '/chat', null),
+      _Tile('Data Breach', Icons.lock_outline, const Color(0xFFBF360C), '/chat', '!'),
+      _Tile('App Security', Icons.android, const Color(0xFF2E7D32), '/app-scanner', '3'),
     ];
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 14,
-          crossAxisSpacing: 14,
-          childAspectRatio: 1.15,
-        ),
-        itemCount: tools.length,
-        itemBuilder: (context, i) {
-          final t = tools[i];
-          return GestureDetector(
-            onTap: () => context.go(t.route),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: isDark ? AppTheme.darkCard : AppTheme.lightCard,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isDark ? AppTheme.darkBorder : const Color(0xFFE8EDF8),
-                ),
-                boxShadow: isDark
-                    ? []
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        )
-                      ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: t.color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Center(
-                      child: Text(t.emoji, style: const TextStyle(fontSize: 22)),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    t.title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                      color: isDark ? Colors.white : AppTheme.darkSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    t.subtitle,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark ? Colors.white38 : Colors.black38,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 24, 22, 14),
+          child: Text(
+            'QUICK TILES',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              color: isDark ? Colors.white54 : Colors.black45,
+              letterSpacing: 1.8,
             ),
-          ).animate().fadeIn(delay: Duration(milliseconds: i * 60)).slideY(begin: 0.1);
-        },
-      ),
-    );
-  }
-
-  Widget _buildStatsRow(BuildContext context, bool isDark) {
-    final stats = [
-      ('🛡️', '12', 'Scam Pakde'),
-      ('🌐', '8', 'Sites Checked'),
-      ('📱', '3', 'Risky Apps'),
-      ('✅', '30', 'Safe Days'),
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        children: stats.asMap().entries.map((e) {
-          final s = e.value;
-          return Expanded(
-            child: Container(
-              margin: EdgeInsets.only(right: e.key < stats.length - 1 ? 10 : 0),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(
-                color: isDark ? AppTheme.darkCard : AppTheme.lightCard,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isDark ? AppTheme.darkBorder : const Color(0xFFE8EDF8),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 22),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 14,
+              childAspectRatio: 0.9,
+            ),
+            itemCount: tiles.length,
+            itemBuilder: (context, i) {
+              final t = tiles[i];
+              return GestureDetector(
+                onTap: () => GoRouter.of(context).go(t.route),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF161B27) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                        border: Border.all(
+                          color: isDark
+                              ? const Color(0xFF30363D)
+                              : const Color(0xFFE8EEF8),
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: t.color.withValues(alpha: isDark ? 0.15 : 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              t.icon,
+                              color: t.color,
+                              size: 28,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            t.label,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (t.badge != null)
+                      Positioned(
+                        top: -4,
+                        right: -4,
+                        child: Container(
+                          width: 22,
+                          height: 22,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE53935),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              t.badge!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-              child: Column(
-                children: [
-                  Text(s.$1, style: const TextStyle(fontSize: 18)),
-                  const SizedBox(height: 4),
-                  Text(
-                    s.$2,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: AppTheme.primary,
-                    ),
-                  ),
-                  Text(
-                    s.$3,
-                    style: TextStyle(
-                      fontSize: 9,
-                      color: isDark ? Colors.white38 : Colors.black38,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ).animate().fadeIn(delay: Duration(milliseconds: e.key * 70 + 200)),
-          );
-        }).toList(),
-      ),
+              ).animate().fadeIn(delay: Duration(milliseconds: i * 55)).scale(begin: const Offset(0.9, 0.9));
+            },
+          ),
+        ),
+      ],
     );
   }
+}
 
-  Widget _buildTipCard(BuildContext context, bool isDark) {
+class _Tile {
+  final String label, route;
+  final IconData icon;
+  final Color color;
+  final String? badge;
+  const _Tile(this.label, this.icon, this.color, this.route, this.badge);
+}
+
+// ─── Tip Card ─────────────────────────────────────────────────────────────────
+class _TipCard extends StatelessWidget {
+  final bool isDark;
+  const _TipCard({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.fromLTRB(22, 24, 22, 0),
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: isDark
-              ? AppTheme.cautionAmber.withValues(alpha: 0.1)
+              ? const Color(0xFFFFB300).withValues(alpha: 0.08)
               : const Color(0xFFFFF8E1),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: AppTheme.cautionAmber.withValues(alpha: isDark ? 0.3 : 0.4),
+            color: const Color(0xFFFFB300).withValues(alpha: isDark ? 0.25 : 0.4),
           ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
-                color: AppTheme.cautionAmber.withValues(alpha: 0.15),
+                color: const Color(0xFFFFB300).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Center(child: Text('💡', style: TextStyle(fontSize: 22))),
+              child: const Icon(Icons.lightbulb_outline, color: Color(0xFFFFB300), size: 22),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -369,13 +466,13 @@ class HomeScreen extends StatelessWidget {
                     'Aaj Ka Tip',
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                      color: isDark ? AppTheme.cautionAmber : const Color(0xFFE65100),
+                      fontSize: 13,
+                      color: isDark ? const Color(0xFFFFB300) : const Color(0xFFE65100),
                     ),
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    'Bank kabhi bhi phone pe OTP nahi maangta. Aisa koi bhi call aaye to seedha bank helpline pe call karo aur 1930 pe report karo.',
+                    'Koi bhi unknown link pe click karne se pehle URL Scanner se check karo. 80% phishing sites ko detect kar leta hai.',
                     style: TextStyle(
                       fontSize: 13,
                       height: 1.5,
@@ -390,10 +487,4 @@ class HomeScreen extends StatelessWidget {
       ).animate().fadeIn(delay: 350.ms),
     );
   }
-}
-
-class _ToolData {
-  final String emoji, title, subtitle, route;
-  final Color color;
-  const _ToolData(this.emoji, this.title, this.subtitle, this.color, this.route);
 }

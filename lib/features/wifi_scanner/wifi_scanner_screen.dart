@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:network_info_plus/network_info_plus.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../../core/widgets/arc_gauge.dart';
 
 class WifiScannerScreen extends StatefulWidget {
   const WifiScannerScreen({super.key});
@@ -11,611 +14,696 @@ class WifiScannerScreen extends StatefulWidget {
 }
 
 class _WifiScannerScreenState extends State<WifiScannerScreen> {
-  _WifiState _state = _WifiState.idle;
-  WifiResult? _result;
-  final _networkInfo = NetworkInfo();
+  static const _channel = MethodChannel('com.safesignal/app_scanner');
+
+  _Phase _phase = _Phase.idle;
+  _WifiResult? _result;
 
   Future<void> _scan() async {
     setState(() {
-      _state = _WifiState.scanning;
+      _phase = _Phase.scanning;
       _result = null;
     });
 
-    await Future.delayed(const Duration(seconds: 2)); // simulate checks
-
-    try {
-      final connectivityResult = await Connectivity().checkConnectivity();
-      final isWifi = connectivityResult.contains(ConnectivityResult.wifi);
-
-      if (!isWifi) {
-        setState(() {
-          _state = _WifiState.done;
-          _result = WifiResult.noWifi();
-        });
-        return;
-      }
-
-      // Get network info
-      String? ssid;
-      String? bssid;
-      String? gateway;
-      String? ip;
-
-      try {
-        ssid = await _networkInfo.getWifiName();
-        bssid = await _networkInfo.getWifiBSSID();
-        gateway = await _networkInfo.getWifiGatewayIP();
-        // subnet check skipped (unused)
-        ip = await _networkInfo.getWifiIP();
-      } catch (_) {
-        ssid = 'Unknown Network';
-      }
-
-      // Clean SSID (remove quotes)
-      ssid = ssid?.replaceAll('"', '') ?? 'Unknown';
-
-      final checks = <WifiCheck>[];
-      int riskScore = 0;
-
-      // Check 1: Public/open network indicators
-      final publicKeywords = ['free', 'public', 'open', 'guest', 'cafe', 'hotel',
-          'airport', 'station', 'mall', 'restaurant', 'starbucks'];
-      final isPublicLike = publicKeywords.any((k) => ssid!.toLowerCase().contains(k));
-      if (isPublicLike) {
-        riskScore += 30;
-        checks.add(WifiCheck(
-          name: 'Network Type',
-          status: CheckStatus.warning,
-          detail: 'Public network lagta hai — banking mat karo',
-        ));
-      } else {
-        checks.add(WifiCheck(
-          name: 'Network Type',
-          status: CheckStatus.safe,
-          detail: 'Private network hai',
-        ));
-      }
-
-      // Check 2: Default router names (often not secured)
-      final defaultRouterNames = ['dlink', 'd-link', 'netgear', 'tp-link', 'tplink',
-          'linksys', 'asus', 'belkin', 'default', 'router', 'wifi', 'wireless'];
-      final isDefault = defaultRouterNames.any((k) => ssid!.toLowerCase().contains(k));
-      if (isDefault) {
-        riskScore += 20;
-        checks.add(WifiCheck(
-          name: 'Router Configuration',
-          status: CheckStatus.warning,
-          detail: 'Default naam se lagta hai router properly configured nahi — password change karein',
-        ));
-      } else {
-        checks.add(WifiCheck(
-          name: 'Router Configuration',
-          status: CheckStatus.safe,
-          detail: 'Custom network naam — likely configured hai',
-        ));
-      }
-
-      // Check 3: Suspicious/clone network names
-      final suspiciousKeywords = ['hack', 'evil', 'spy', 'sniff', 'mitm', 'fake'];
-      final isSuspiciousName = suspiciousKeywords.any((k) => ssid!.toLowerCase().contains(k));
-      if (isSuspiciousName) {
-        riskScore += 50;
-        checks.add(WifiCheck(
-          name: 'Network Name Safety',
-          status: CheckStatus.danger,
-          detail: 'Network ka naam suspicious hai!',
-        ));
-      } else {
-        checks.add(WifiCheck(
-          name: 'Network Name Safety',
-          status: CheckStatus.safe,
-          detail: 'Network naam suspicious nahi',
-        ));
-      }
-
-      // Check 4: IP range check (common home ranges are fine)
-      if (ip != null && ip.isNotEmpty) {
-        final isPrivateIp = ip.startsWith('192.168.') ||
-            ip.startsWith('10.') ||
-            ip.startsWith('172.');
-        if (!isPrivateIp) {
-          riskScore += 25;
-          checks.add(WifiCheck(
-            name: 'IP Address Range',
-            status: CheckStatus.warning,
-            detail: 'Unusual IP address ($ip) — suspicious',
-          ));
-        } else {
-          checks.add(WifiCheck(
-            name: 'IP Address Range',
-            status: CheckStatus.safe,
-            detail: 'Normal private IP ($ip)',
-          ));
-        }
-      }
-
-      // Check 5: Gateway check
-      if (gateway != null && gateway.isNotEmpty) {
-        checks.add(WifiCheck(
-          name: 'Gateway Detected',
-          status: CheckStatus.safe,
-          detail: 'Router gateway: $gateway',
-        ));
-      } else {
-        riskScore += 10;
-        checks.add(WifiCheck(
-          name: 'Gateway Detected',
-          status: CheckStatus.warning,
-          detail: 'Gateway detect nahi ho saka',
-        ));
-      }
-
-      // Check 6: VPN recommendation for public
-      if (isPublicLike) {
-        checks.add(WifiCheck(
-          name: 'VPN Recommendation',
-          status: CheckStatus.warning,
-          detail: 'Public WiFi pe VPN use karo — zyada safe rahoge',
-        ));
-      }
-
-      final verdict = riskScore >= 50
-          ? WifiVerdict.dangerous
-          : riskScore >= 20
-              ? WifiVerdict.caution
-              : WifiVerdict.safe;
-
-      final tips = <String>[
-        if (isPublicLike) 'Public WiFi pe banking/UPI BILKUL mat karo',
-        if (isPublicLike) 'VPN use karo agar public WiFi use karna hai',
-        if (isDefault) 'Apne router ka naam aur password badlo',
-        'WiFi se disconnect karo jab use na ho',
-        'Ghar ka WiFi WPA3 ya WPA2 pe set karo',
-        'Unknown networks se connect mat hona',
-      ];
-
+    // Request location permission (needed for SSID on Android 9+)
+    final locPerm = await Permission.locationWhenInUse.request();
+    if (!locPerm.isGranted) {
       setState(() {
-        _state = _WifiState.done;
-        _result = WifiResult(
-          ssid: ssid ?? 'Unknown',
-          bssid: bssid ?? 'N/A',
-          ip: ip ?? 'N/A',
-          gateway: gateway ?? 'N/A',
-          riskScore: riskScore.clamp(0, 100),
-          verdict: verdict,
-          checks: checks,
-          tips: tips,
-          isConnected: true,
-        );
+        _phase = _Phase.done;
+        _result = _WifiResult.permissionDenied();
       });
-    } catch (e) {
-      setState(() {
-        _state = _WifiState.done;
-        _result = WifiResult.error();
-      });
+      return;
     }
+
+    final connectivity = await Connectivity().checkConnectivity();
+    final isWifi = connectivity.contains(ConnectivityResult.wifi);
+
+    if (!isWifi) {
+      setState(() {
+        _phase = _Phase.done;
+        _result = _WifiResult.noWifi();
+      });
+      return;
+    }
+
+    final info = NetworkInfo();
+    final ssid = (await info.getWifiName())?.replaceAll('"', '') ?? 'Unknown';
+    final bssid = await info.getWifiBSSID() ?? 'N/A';
+    final ip = await info.getWifiIP() ?? 'N/A';
+    final gateway = await info.getWifiGatewayIP() ?? 'N/A';
+
+    // Get WiFi security type from native Android
+    String securityType = 'Unknown';
+    try {
+      final result = await _channel.invokeMethod<String>('getWifiSecurityType');
+      securityType = result ?? 'Unknown';
+    } catch (_) {
+      securityType = 'WPA2'; // fallback
+    }
+
+    // Build analysis
+    final checks = <_Check>[];
+    int score = 100; // start at 100, deduct for issues
+
+    // Encryption check
+    final encryptionLevel = _getEncryptionLevel(securityType);
+    if (encryptionLevel == 0) {
+      // Open network
+      score -= 70;
+      checks.add(_Check(
+        label: 'Encryption',
+        detail: 'OPEN NETWORK — Koi encryption nahi! Data completely exposed hai',
+        level: _Level.critical,
+        icon: Icons.lock_open,
+      ));
+    } else if (encryptionLevel == 1) {
+      // WEP — very old, broken
+      score -= 50;
+      checks.add(_Check(
+        label: 'Encryption (WEP)',
+        detail: 'WEP bahut purani aur broken encryption hai — easily hack ho sakta hai',
+        level: _Level.danger,
+        icon: Icons.lock_outlined,
+      ));
+    } else if (encryptionLevel == 2) {
+      // WPA/WPA2
+      score -= 10;
+      checks.add(_Check(
+        label: 'Encryption (WPA2)',
+        detail: 'WPA2 with PSK+CCMP security. Safe hai lekin WPA3 se upgrade karein',
+        level: _Level.ok,
+        icon: Icons.lock,
+      ));
+    } else {
+      // WPA3 — best
+      checks.add(_Check(
+        label: 'Encryption (WPA3)',
+        detail: 'WPA3 — Latest aur strongest encryption standard. Excellent!',
+        level: _Level.safe,
+        icon: Icons.lock,
+      ));
+    }
+
+    // Public network name check
+    final publicKw = ['free', 'public', 'open', 'guest', 'cafe', 'hotel', 'airport'];
+    if (publicKw.any((k) => ssid.toLowerCase().contains(k))) {
+      score -= 30;
+      checks.add(_Check(
+        label: 'Network Type',
+        detail: 'Public network — banking aur UPI BILKUL mat karo',
+        level: _Level.danger,
+        icon: Icons.public_off,
+      ));
+    } else {
+      checks.add(_Check(
+        label: 'Network Type',
+        detail: 'Private network — likely aapka ghar/office WiFi',
+        level: _Level.safe,
+        icon: Icons.home_outlined,
+      ));
+    }
+
+    // Default router name check
+    final defaultNames = ['dlink', 'netgear', 'tp-link', 'tplink', 'linksys', 'asus', 'belkin'];
+    if (defaultNames.any((k) => ssid.toLowerCase().contains(k))) {
+      score -= 15;
+      checks.add(_Check(
+        label: 'Router Configuration',
+        detail: 'Default router naam se lagta hai iska password kabhi change nahi hua',
+        level: _Level.warning,
+        icon: Icons.router_outlined,
+      ));
+    } else {
+      checks.add(_Check(
+        label: 'Router Configuration',
+        detail: 'Custom network naam — properly configured lagta hai',
+        level: _Level.safe,
+        icon: Icons.router,
+      ));
+    }
+
+    // IP range check
+    final isPrivateIp = ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.');
+    if (!isPrivateIp && ip != 'N/A') {
+      score -= 20;
+      checks.add(_Check(
+        label: 'IP Address',
+        detail: 'Unusual IP range ($ip) — suspicious',
+        level: _Level.warning,
+        icon: Icons.router_outlined,
+      ));
+    } else {
+      checks.add(_Check(
+        label: 'IP Address',
+        detail: 'Normal private IP ($ip) — theek hai',
+        level: _Level.safe,
+        icon: Icons.router,
+      ));
+    }
+
+    score = score.clamp(0, 100);
+    final rating = (score / 20).clamp(0.0, 5.0); // 0-100 → 0-5
+
+    final recommendations = _getRecommendations(securityType, encryptionLevel, ssid);
+
+    setState(() {
+      _phase = _Phase.done;
+      _result = _WifiResult(
+        ssid: ssid,
+        bssid: bssid,
+        ip: ip,
+        gateway: gateway,
+        securityType: securityType,
+        score: score,
+        rating: rating,
+        checks: checks,
+        recommendations: recommendations,
+        isConnected: true,
+      );
+    });
+  }
+
+  int _getEncryptionLevel(String secType) {
+    final s = secType.toUpperCase();
+    if (s.contains('WPA3')) return 3;
+    if (s.contains('WPA2') || s.contains('WPA')) return 2;
+    if (s.contains('WEP')) return 1;
+    if (s == 'OPEN' || s == 'NONE' || s.isEmpty || s == 'UNKNOWN') return 0;
+    return 2; // assume WPA2 if unknown
+  }
+
+  List<String> _getRecommendations(String secType, int level, String ssid) {
+    final recs = <String>[];
+    if (level < 3) recs.add('1. WPA3 sabse latest aur strong standard hai — router settings mein enable karein');
+    if (level == 2) recs.add('2. WPA2 abhi bhi safe hai — use karte rehein');
+    if (level < 2) recs.add('2. Abhi router settings mein jaake WPA2/WPA3 enable karein');
+    recs.add('3. Router admin panel ka default password zaroor change karein');
+    recs.add('4. Public WiFi pe VPN use karein banking ke liye');
+    return recs;
   }
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF06090F) : const Color(0xFFF0F4FF);
+
     return Scaffold(
+      backgroundColor: bg,
       appBar: AppBar(
-        title: const Text('WiFi Security Scanner', style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1565C0), Color(0xFF0D47A1)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('📶', style: TextStyle(fontSize: 36)),
-                  SizedBox(height: 8),
-                  Text(
-                    'WiFi Safe Hai Ya Nahi?',
-                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Apne current network ki security check karo',
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                ],
-              ),
-            ).animate().fadeIn(),
-
-            const SizedBox(height: 24),
-
-            // Scan button
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed: _state == _WifiState.scanning ? null : _scan,
-                icon: _state == _WifiState.scanning
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.wifi_find_outlined),
-                label: Text(
-                  _state == _WifiState.scanning
-                      ? 'Network scan ho raha hai...'
-                      : '📶 WiFi Scan Karo',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1565C0),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-              ),
-            ).animate().fadeIn(delay: 100.ms),
-
-            const SizedBox(height: 24),
-
-            if (_result != null) _buildResult(_result!, cs),
-            if (_state == _WifiState.idle) _buildInfoCards(),
-          ],
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new,
+              color: isDark ? Colors.white : const Color(0xFF0D1117), size: 20),
+          onPressed: () => Navigator.pop(context),
         ),
+        title: Text(
+          'Wi Fi',
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 24,
+            color: isDark ? Colors.white : const Color(0xFF0D1117),
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: _phase == _Phase.idle
+          ? _buildIdle(isDark)
+          : _phase == _Phase.scanning
+              ? _buildScanning(isDark)
+              : _buildResult(isDark),
+    );
+  }
+
+  Widget _buildIdle(bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 110,
+            height: 110,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFB300).withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.wifi_find, size: 56, color: Color(0xFFFFB300)),
+          ).animate().scale(begin: const Offset(0.7, 0.7)).fadeIn(),
+          const SizedBox(height: 28),
+          Text(
+            'WiFi Security Analyzer',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              color: isDark ? Colors.white : const Color(0xFF0D1117),
+            ),
+          ).animate().fadeIn(delay: 100.ms),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              'Aapke current WiFi network ka real encryption type, security level, aur vulnerabilities check karo',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.6,
+                color: isDark ? Colors.white54 : Colors.black54,
+              ),
+            ),
+          ).animate().fadeIn(delay: 150.ms),
+          const SizedBox(height: 36),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: ElevatedButton.icon(
+              onPressed: _scan,
+              icon: const Icon(Icons.radar, size: 22),
+              label: const Text('WiFi Scan Karo'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFB300),
+                foregroundColor: Colors.black,
+                minimumSize: const Size.fromHeight(56),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                elevation: 0,
+              ),
+            ),
+          ).animate().fadeIn(delay: 220.ms),
+        ],
       ),
     );
   }
 
-  Widget _buildResult(WifiResult result, ColorScheme cs) {
-    if (!result.isConnected) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Column(
+  Widget _buildScanning(bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 120,
+            height: 120,
+            child: CircularProgressIndicator(
+              strokeWidth: 6,
+              color: const Color(0xFFFFB300),
+              backgroundColor: const Color(0xFFFFB300).withValues(alpha: 0.15),
+            ),
+          )
+              .animate(onPlay: (c) => c.repeat())
+              .rotate(duration: 1200.ms),
+          const SizedBox(height: 28),
+          Text(
+            'Network scan ho raha hai...',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: isDark ? Colors.white : const Color(0xFF0D1117),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Encryption type check ho rahi hai',
+            style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResult(bool isDark) {
+    final r = _result!;
+
+    if (!r.isConnected) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('📡', style: TextStyle(fontSize: 48)),
-            SizedBox(height: 12),
-            Text('WiFi Connected Nahi Hai',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            Text('Pehle WiFi se connect karo, phir scan karo',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey)),
+            const Icon(Icons.wifi_off, size: 72, color: Colors.grey),
+            const SizedBox(height: 20),
+            Text(
+              'WiFi Connected Nahi Hai',
+              style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : const Color(0xFF0D1117)),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              r.message ?? 'Pehle WiFi se connect karo',
+              style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 28),
+            ElevatedButton(
+              onPressed: _scan,
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFB300),
+                  foregroundColor: Colors.black),
+              child: const Text('Dobara Try Karo'),
+            ),
           ],
         ),
-      ).animate().fadeIn();
+      );
     }
 
-    final verdictColor = result.verdict == WifiVerdict.safe
-        ? const Color(0xFF2E7D32)
-        : result.verdict == WifiVerdict.dangerous
-            ? const Color(0xFFD32F2F)
-            : const Color(0xFFF57F17);
+    final gaugeColor = r.score >= 70
+        ? const Color(0xFF4CAF50)
+        : r.score >= 40
+            ? const Color(0xFFFFB300)
+            : const Color(0xFFE53935);
 
-    final verdictBg = result.verdict == WifiVerdict.safe
-        ? const Color(0xFFE8F5E9)
-        : result.verdict == WifiVerdict.dangerous
-            ? const Color(0xFFFFEBEE)
-            : const Color(0xFFFFF8E1);
+    final verdictText = r.score >= 70 ? 'SAFE' : r.score >= 40 ? 'CAUTION' : 'UNSAFE';
 
-    final verdictText = result.verdict == WifiVerdict.safe
-        ? 'SAFE NETWORK ✅'
-        : result.verdict == WifiVerdict.dangerous
-            ? 'UNSAFE NETWORK! 🔴'
-            : 'SAVDHAN RAHO ⚠️';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Main verdict
-        Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: verdictBg,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: verdictColor.withValues(alpha: 0.4), width: 1.5),
-          ),
-          child: Column(
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: verdictColor,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.wifi, color: Colors.white, size: 32),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(verdictText,
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                          Text(result.ssid,
-                              style: const TextStyle(color: Colors.white70, fontSize: 14),
-                              overflow: TextOverflow.ellipsis),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(22, 0, 22, 32),
+      child: Column(
+        children: [
+          // Gauge
+          SizedBox(
+            width: 240,
+            height: 200,
+            child: ArcGauge(
+              value: r.rating,
+              maxValue: 5.0,
+              color: gaugeColor,
+              trackColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE0E0E0),
+              strokeWidth: 18,
+              sweepDegrees: 210,
+              centerChild: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 20),
+                  RichText(
+                    text: TextSpan(
                       children: [
-                        const Text('Risk Score:', style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text('${result.riskScore}/100',
-                            style: TextStyle(color: verdictColor, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                        value: result.riskScore / 100,
-                        minHeight: 10,
-                        backgroundColor: Colors.grey.shade200,
-                        valueColor: AlwaysStoppedAnimation<Color>(verdictColor),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ).animate().fadeIn().scale(begin: const Offset(0.95, 0.95)),
-
-        const SizedBox(height: 16),
-
-        // Network Details
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cs.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Network Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 12),
-              _detailRow('📶 Network (SSID)', result.ssid),
-              _detailRow('📍 IP Address', result.ip),
-              _detailRow('🔀 Gateway', result.gateway),
-            ],
-          ),
-        ).animate().fadeIn(delay: 100.ms),
-
-        const SizedBox(height: 16),
-
-        // Security Checks
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cs.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Security Checks', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 12),
-              ...result.checks.asMap().entries.map((e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: e.value.status == CheckStatus.safe
-                                ? const Color(0xFF2E7D32).withValues(alpha: 0.1)
-                                : e.value.status == CheckStatus.danger
-                                    ? const Color(0xFFD32F2F).withValues(alpha: 0.1)
-                                    : const Color(0xFFF57F17).withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            e.value.status == CheckStatus.safe
-                                ? Icons.check
-                                : e.value.status == CheckStatus.danger
-                                    ? Icons.close
-                                    : Icons.warning_amber_outlined,
-                            size: 16,
-                            color: e.value.status == CheckStatus.safe
-                                ? const Color(0xFF2E7D32)
-                                : e.value.status == CheckStatus.danger
-                                    ? const Color(0xFFD32F2F)
-                                    : const Color(0xFFF57F17),
+                        TextSpan(
+                          text: r.rating.toStringAsFixed(0),
+                          style: TextStyle(
+                            fontSize: 56,
+                            fontWeight: FontWeight.w900,
+                            color: gaugeColor,
+                            height: 1,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(e.value.name,
-                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                              Text(e.value.detail,
-                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                            ],
+                        TextSpan(
+                          text: '.${((r.rating * 10) % 10).round()}',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w700,
+                            color: gaugeColor.withValues(alpha: 0.7),
+                            height: 1,
                           ),
                         ),
                       ],
                     ),
-                  ).animate().fadeIn(delay: Duration(milliseconds: e.key * 80))),
-            ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '5',
+                    style: TextStyle(
+                      color: isDark ? Colors.white38 : Colors.black38,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ).animate().fadeIn(delay: 150.ms),
 
-        // Tips
-        if (result.tips.isNotEmpty) ...[
-          const SizedBox(height: 16),
+          // SSID name
+          Text(
+            r.ssid,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              color: isDark ? Colors.white : const Color(0xFF0D1117),
+            ),
+          ).animate().fadeIn(),
+
+          const SizedBox(height: 20),
+
+          // Verdict card
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF3E0),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFF57F17).withValues(alpha: 0.4)),
+              color: gaugeColor.withValues(alpha: isDark ? 0.1 : 0.08),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: gaugeColor.withValues(alpha: 0.4), width: 1.5),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('💡 Safety Tips:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFFE65100))),
-                const SizedBox(height: 8),
-                ...result.tips.map((t) => Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: gaugeColor,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        verdictText,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Encryption: ${r.securityType}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: isDark ? Colors.white : const Color(0xFF0D1117),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  _getEncryptionDescription(r.securityType),
+                  style: TextStyle(
+                    color: gaugeColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Recommended steps
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          const Text('• ', style: TextStyle(color: Color(0xFFE65100))),
-                          Expanded(child: Text(t, style: const TextStyle(fontSize: 13))),
+                          Text(
+                            'Recommended Steps',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              color: gaugeColor,
+                            ),
+                          ),
+                          const Spacer(),
+                          Icon(Icons.check_circle, color: gaugeColor, size: 20),
                         ],
                       ),
-                    )),
+                      const SizedBox(height: 10),
+                      ...r.recommendations.map((rec) => Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Text(
+                              rec,
+                              style: TextStyle(
+                                fontSize: 13,
+                                height: 1.4,
+                                color: isDark ? Colors.white70 : Colors.black87,
+                              ),
+                            ),
+                          )),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ).animate().fadeIn(delay: 200.ms),
-        ],
+          ).animate().fadeIn(delay: 150.ms),
 
-        const SizedBox(height: 16),
-      ],
-    );
-  }
+          const SizedBox(height: 16),
 
-  Widget _detailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-          Text(value,
-              style: const TextStyle(fontSize: 13, color: Colors.grey),
-              overflow: TextOverflow.ellipsis),
-        ],
-      ),
-    );
-  }
+          // Security checks
+          ...r.checks.asMap().entries.map((e) {
+            final c = e.value;
+            final color = c.level == _Level.safe
+                ? const Color(0xFF4CAF50)
+                : c.level == _Level.ok
+                    ? const Color(0xFF66BB6A)
+                    : c.level == _Level.warning
+                        ? const Color(0xFFFFB300)
+                        : c.level == _Level.danger
+                            ? const Color(0xFFE53935)
+                            : const Color(0xFFB71C1C);
 
-  Widget _buildInfoCards() {
-    final items = [
-      ('⚠️', 'Public WiFi Danger', 'Free WiFi pe hackers aapka data chura sakte hain'),
-      ('🏠', 'Ghar ka WiFi', 'WPA2/WPA3 encryption use karein'),
-      ('🔐', 'Password', 'Simple password kabhi mat rakhein'),
-      ('📵', 'Auto-connect', 'Unknown networks se auto-connect band karo'),
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('📚 WiFi ke Baare Mein Jaano',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 12),
-        ...items.asMap().entries.map((e) => Container(
+            return Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFF1565C0).withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF1565C0).withValues(alpha: 0.1)),
+                color: isDark ? const Color(0xFF161B27) : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8EEF8),
+                ),
               ),
               child: Row(
                 children: [
-                  Text(e.value.$1, style: const TextStyle(fontSize: 28)),
-                  const SizedBox(width: 12),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(c.icon, color: color, size: 20),
+                  ),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(e.value.$2,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                        Text(e.value.$3,
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                        Text(
+                          c.label,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                            color: isDark ? Colors.white : const Color(0xFF0D1117),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          c.detail,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.white54 : Colors.black54,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
-            ).animate().fadeIn(delay: Duration(milliseconds: e.key * 80))),
-      ],
+            ).animate().fadeIn(delay: Duration(milliseconds: 200 + e.key * 70));
+          }),
+
+          const SizedBox(height: 16),
+
+          // Open Settings button
+          ElevatedButton.icon(
+            onPressed: () async {
+              const MethodChannel('com.safesignal/app_scanner')
+                  .invokeMethod('openWifiSettings');
+            },
+            icon: const Icon(Icons.open_in_new, size: 18),
+            label: Text('${r.ssid} Settings Kholo'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDark ? const Color(0xFF161B27) : Colors.white,
+              foregroundColor: isDark ? Colors.white : const Color(0xFF0D1117),
+              minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(
+                  color: isDark ? const Color(0xFF30363D) : const Color(0xFFE0E0E0),
+                ),
+              ),
+              elevation: 0,
+            ),
+          ).animate().fadeIn(delay: 500.ms),
+
+          const SizedBox(height: 12),
+
+          // BSSID
+          Text(
+            "Router's BSSID: ${r.bssid}",
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? Colors.white38 : Colors.black38,
+            ),
+          ).animate().fadeIn(delay: 550.ms),
+        ],
+      ),
     );
+  }
+
+  String _getEncryptionDescription(String secType) {
+    final s = secType.toUpperCase();
+    if (s.contains('WPA3')) {
+      return 'Aapka WiFi Router WPA3 security use karta hai. Yeh sabse latest aur strongest standard hai. Excellent!';
+    }
+    if (s.contains('WPA2')) {
+      return 'Aapka WiFi Router WPA2 with PSK+CCMP Security use karta hai. Yeh Network Safe Hai.';
+    }
+    if (s.contains('WPA')) {
+      return 'Aapka Router WPA security use karta hai. WPA2 ya WPA3 pe upgrade karna better hoga.';
+    }
+    if (s.contains('WEP')) {
+      return 'DANGER! WEP encryption bahut purani aur broken hai. Koi bhi aasani se hack kar sakta hai!';
+    }
+    return 'Open Network — Koi encryption nahi. Aapka data completely exposed hai!';
   }
 }
 
-enum _WifiState { idle, scanning, done }
-enum WifiVerdict { safe, caution, dangerous }
-enum CheckStatus { safe, warning, danger }
+// ─── Models ───────────────────────────────────────────────────────────────────
+enum _Phase { idle, scanning, done }
+enum _Level { safe, ok, warning, danger, critical }
 
-class WifiCheck {
-  final String name;
-  final CheckStatus status;
-  final String detail;
-  const WifiCheck({required this.name, required this.status, required this.detail});
+class _Check {
+  final String label, detail;
+  final _Level level;
+  final IconData icon;
+  const _Check({required this.label, required this.detail, required this.level, required this.icon});
 }
 
-class WifiResult {
-  final String ssid;
-  final String bssid;
-  final String ip;
-  final String gateway;
-  final int riskScore;
-  final WifiVerdict verdict;
-  final List<WifiCheck> checks;
-  final List<String> tips;
+class _WifiResult {
+  final String ssid, bssid, ip, gateway, securityType;
+  final int score;
+  final double rating;
+  final List<_Check> checks;
+  final List<String> recommendations;
   final bool isConnected;
+  final String? message;
 
-  const WifiResult({
+  const _WifiResult({
     required this.ssid,
     required this.bssid,
     required this.ip,
     required this.gateway,
-    required this.riskScore,
-    required this.verdict,
+    required this.securityType,
+    required this.score,
+    required this.rating,
     required this.checks,
-    required this.tips,
+    required this.recommendations,
     required this.isConnected,
+    this.message,
   });
 
-  factory WifiResult.noWifi() => const WifiResult(
-        ssid: '', bssid: '', ip: '', gateway: '',
-        riskScore: 0, verdict: WifiVerdict.safe,
-        checks: [], tips: [], isConnected: false,
+  factory _WifiResult.noWifi() => const _WifiResult(
+        ssid: '', bssid: '', ip: '', gateway: '', securityType: '',
+        score: 0, rating: 0, checks: [], recommendations: [],
+        isConnected: false, message: 'WiFi se connect karo phir scan karo',
       );
 
-  factory WifiResult.error() => const WifiResult(
-        ssid: 'Error', bssid: '', ip: '', gateway: '',
-        riskScore: 0, verdict: WifiVerdict.caution,
-        checks: [WifiCheck(name: 'Scan', status: CheckStatus.warning, detail: 'Permission chahiye — Settings se allow karo')],
-        tips: ['Location permission do — WiFi name detect hoga'],
-        isConnected: true,
+  factory _WifiResult.permissionDenied() => const _WifiResult(
+        ssid: '', bssid: '', ip: '', gateway: '', securityType: '',
+        score: 0, rating: 0, checks: [], recommendations: [],
+        isConnected: false, message: 'Location permission chahiye WiFi details ke liye.\nSettings > SafeSignal > Permissions > Location',
       );
 }
