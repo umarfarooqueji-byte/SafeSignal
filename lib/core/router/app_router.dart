@@ -5,11 +5,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/onboarding/language_screen.dart';
 import '../../features/onboarding/disclaimer_screen.dart';
+import '../../features/home/home_screen.dart';
 import '../../features/chat/chat_screen.dart';
 import '../../features/verdict/verdict_screen.dart';
 import '../../features/feed/feed_screen.dart';
 import '../../features/history/history_screen.dart';
 import '../../features/settings/settings_screen.dart';
+import '../../features/url_scanner/url_scanner_screen.dart';
+import '../../features/wifi_scanner/wifi_scanner_screen.dart';
+import '../../features/app_scanner/app_scanner_screen.dart';
 import '../../data/models/verdict_model.dart';
 import '../constants.dart';
 
@@ -33,9 +37,36 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/disclaimer',
         builder: (context, state) => const DisclaimerScreen(),
       ),
+
+      // Full-screen tools (outside shell)
+      GoRoute(
+        path: '/url-scanner',
+        builder: (context, state) => const UrlScannerScreen(),
+      ),
+      GoRoute(
+        path: '/wifi-scanner',
+        builder: (context, state) => const WifiScannerScreen(),
+      ),
+      GoRoute(
+        path: '/app-scanner',
+        builder: (context, state) => const AppScannerScreen(),
+      ),
+      GoRoute(
+        path: '/verdict',
+        builder: (context, state) {
+          final verdict = state.extra as VerdictModel;
+          return VerdictScreen(verdict: verdict);
+        },
+      ),
+
+      // Shell with bottom nav
       ShellRoute(
         builder: (context, state, child) => MainShell(child: child),
         routes: [
+          GoRoute(
+            path: '/home',
+            builder: (context, state) => const HomeScreen(),
+          ),
           GoRoute(
             path: '/chat',
             builder: (context, state) => const ChatScreen(),
@@ -54,13 +85,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      GoRoute(
-        path: '/verdict',
-        builder: (context, state) {
-          final verdict = state.extra as VerdictModel;
-          return VerdictScreen(verdict: verdict);
-        },
-      ),
     ],
   );
 });
@@ -72,21 +96,42 @@ class SplashRedirectScreen extends StatefulWidget {
   State<SplashRedirectScreen> createState() => _SplashRedirectScreenState();
 }
 
-class _SplashRedirectScreenState extends State<SplashRedirectScreen> {
+class _SplashRedirectScreenState extends State<SplashRedirectScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnim;
+  late Animation<double> _fadeAnim;
+
   @override
   void initState() {
     super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _scaleAnim = CurvedAnimation(parent: _controller, curve: Curves.elasticOut)
+        .drive(Tween(begin: 0.5, end: 1.0));
+    _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeIn)
+        .drive(Tween(begin: 0.0, end: 1.0));
+    _controller.forward();
     _redirect();
   }
 
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   Future<void> _redirect() async {
-    await Future.delayed(const Duration(milliseconds: 1500));
+    await Future.delayed(const Duration(milliseconds: 2000));
     if (!mounted) return;
     final prefs = await SharedPreferences.getInstance();
-    final onboardingDone = prefs.getBool(AppConstants.prefOnboardingDone) ?? false;
+    final onboardingDone =
+        prefs.getBool(AppConstants.prefOnboardingDone) ?? false;
     if (!mounted) return;
     if (onboardingDone) {
-      context.go('/chat');
+      context.go('/home');
     } else {
       context.go('/onboarding');
     }
@@ -94,38 +139,62 @@ class _SplashRedirectScreenState extends State<SplashRedirectScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
+      backgroundColor: cs.primary,
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                borderRadius: BorderRadius.circular(24),
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return FadeTransition(
+              opacity: _fadeAnim,
+              child: ScaleTransition(
+                scale: _scaleAnim,
+                child: child,
               ),
-              child: const Icon(Icons.shield_outlined, size: 60, color: Colors.white),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'SafeSignal',
-              style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Scam se bachao',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Colors.grey,
-                  ),
-            ),
-            const SizedBox(height: 32),
-            const CircularProgressIndicator(),
-          ],
+            );
+          },
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 110,
+                height: 110,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: const Icon(Icons.shield_outlined, size: 64, color: Colors.white),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'SafeSignal',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Aapka Digital Suraksha Kawach',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 48),
+              SizedBox(
+                width: 36,
+                height: 36,
+                child: CircularProgressIndicator(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  strokeWidth: 3,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -143,7 +212,7 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
 
-  static const _routes = ['/chat', '/feed', '/history', '/settings'];
+  static const _routes = ['/home', '/chat', '/feed', '/history', '/settings'];
 
   @override
   Widget build(BuildContext context) {
@@ -151,11 +220,17 @@ class _MainShellState extends State<MainShell> {
       body: widget.child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
+        height: 65,
         onDestinationSelected: (index) {
           setState(() => _selectedIndex = index);
           context.go(_routes[index]);
         },
         destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
           NavigationDestination(
             icon: Icon(Icons.chat_bubble_outline),
             selectedIcon: Icon(Icons.chat_bubble),
