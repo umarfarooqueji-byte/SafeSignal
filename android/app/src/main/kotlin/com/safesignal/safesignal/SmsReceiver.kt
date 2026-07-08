@@ -29,11 +29,59 @@ class SmsReceiver : BroadcastReceiver() {
                 val analysis = analyzeSms(body, sender)
                 if (analysis.isSuspicious) {
                     showScamNotification(context, sender, body, analysis)
+                } else {
+                    showSafeNotification(context, sender, body, analysis)
                 }
             }
         } catch (e: Exception) {
             // fail silently
         }
+    }
+
+    private fun showSafeNotification(
+        context: Context, sender: String, body: String, analysis: SmsAnalysis
+    ) {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "SafeSignal SMS Scam Shield",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Real-time SMS scam detection alerts"
+            }
+            nm.createNotificationChannel(channel)
+        }
+
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        val pendingIntent = PendingIntent.getActivity(
+            context, 0, launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.presence_online)
+            .setContentTitle("🟢 Safe SMS — $sender")
+            .setContentText("Message is secure. No scam detected.")
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .setBigContentTitle("🟢 SafeSignal: Message Verified Secure")
+                    .bigText(
+                        "From: $sender\n\n" +
+                        "Message: \"${body.take(200)}${if (body.length > 200) "..." else ""}\"\n\n" +
+                        "✅ Verdict: SECURE & CLEAN\n" +
+                        "SafeSignal analyzed this SMS and found no suspicious links or scam keywords."
+                    )
+                    .setSummaryText("SafeSignal Shield")
+            )
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setColor(android.graphics.Color.GREEN)
+            .build()
+
+        nm.notify(NOTIFICATION_ID_BASE + sender.hashCode(), notification)
     }
 
     // ─── Analysis Result ─────────────────────────────────────────────────────

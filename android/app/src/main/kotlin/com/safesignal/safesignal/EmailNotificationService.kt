@@ -66,7 +66,68 @@ class EmailNotificationService : NotificationListenerService() {
         val analysis = analyzeContent(combined, pkg)
         if (analysis.isSuspicious) {
             showThreatNotification(pkg, title, text, analysis)
+        } else {
+            showSafeEmailNotification(pkg, title, text, analysis)
         }
+    }
+
+    private fun showSafeEmailNotification(
+        sourcePkg: String,
+        title: String,
+        preview: String,
+        analysis: ContentAnalysis
+    ) {
+        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "SafeSignal Email Scam Shield",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Alerts when a suspicious email or notification is detected"
+            }
+            nm.createNotificationChannel(channel)
+        }
+
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val appName = when (sourcePkg) {
+            "com.google.android.gm" -> "Gmail"
+            "com.microsoft.office.outlook" -> "Outlook"
+            "com.yahoo.mobile.client.android.mail" -> "Yahoo Mail"
+            "com.samsung.android.email.provider" -> "Samsung Email"
+            "me.proton.android.mail" -> "ProtonMail"
+            else -> "Email"
+        }
+
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.presence_online)
+            .setContentTitle("🟢 Safe $appName — Secure")
+            .setContentText("SafeSignal: Verified safe and secure email.")
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .setBigContentTitle("🟢 SafeSignal: Verified $appName Secure")
+                    .bigText(
+                        "App: $appName\n" +
+                        "From: ${title.take(60)}\n" +
+                        "Preview: ${preview.take(150)}${if (preview.length > 150) "..." else ""}\n\n" +
+                        "✅ Verdict: SECURE & CLEAN\n" +
+                        "SafeSignal analyzed this email and found no phishing links, digital arrest notices, or lottery scam patterns."
+                    )
+                    .setSummaryText("SafeSignal Email Shield")
+            )
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setColor(android.graphics.Color.GREEN)
+            .build()
+
+        nm.notify(NOTIFICATION_ID_BASE + title.hashCode(), notification)
     }
 
     // ─── Analysis Result ──────────────────────────────────────────────────────
