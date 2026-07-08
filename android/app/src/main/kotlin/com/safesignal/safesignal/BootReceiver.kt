@@ -3,13 +3,31 @@ package com.safesignal.safesignal
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 
 /**
- * Receives BOOT_COMPLETED broadcast — placeholder for future
- * persistent service initialization after phone restart.
+ * Receives BOOT_COMPLETED broadcast to restart background protection services
+ * after the device reboots.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        // Future: start monitoring service here
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+            // Note: SmsReceiver and EmailNotificationService are statically registered
+            // in AndroidManifest.xml and will wake up on their respective events.
+            
+            // If we had a foreground service running continuously, we would start it here.
+            // For example:
+            /*
+            val serviceIntent = Intent(context, PersistentProtectionService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent)
+            } else {
+                context.startService(serviceIntent)
+            }
+            */
+            
+            // Currently, the broadcast receivers are sufficient since they are
+            // triggered by system events (SMS_RECEIVED, PHONE_STATE, Notification).
+        }
     }
 }

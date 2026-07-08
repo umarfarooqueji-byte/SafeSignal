@@ -15,34 +15,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<_OnboardingSlide> _slides = const [
     _OnboardingSlide(
-      emoji: '🛡️',
+      imagePath: 'assets/images/onboarding_1.png',
       title: 'Scam Se Bachao',
       titleEn: 'Stay Safe from Scams',
-      desc: 'Koi bhi shak wala message bhejein.\nHum check karenge.',
+      desc: 'Koi bhi shak wala message bhejein.\nHum use turant check karenge.',
       descEn: 'Forward any suspicious message.\nWe will check it for you.',
-      color: Color(0xFF1565C0),
+      color: Color(0xFF2979FF),
     ),
     _OnboardingSlide(
-      emoji: '⚡',
-      title: 'Turant Nateeja',
-      titleEn: 'Instant Verdict',
-      desc: 'SCAM / SAFE / SAVDHAN —\nKuch hi seconds mein jawab.',
-      descEn: 'SCAM / SAFE / CAUTION —\nResult in seconds.',
-      color: Color(0xFF388E3C),
+      imagePath: 'assets/images/onboarding_2.png',
+      title: 'AI Smart Analysis',
+      titleEn: 'AI Smart Analysis',
+      desc: 'SCAM / SAFE / SAVDHAN —\nDeep details aur risk levels ke sath.',
+      descEn: 'SCAM / SAFE / CAUTION —\nWith deep details and risk metrics.',
+      color: Color(0xFF7C4DFF),
     ),
     _OnboardingSlide(
-      emoji: '🆓',
-      title: 'Bilkul Muft',
-      titleEn: 'Always Free',
-      desc: 'SafeSignal poori tarah muft hai.\nKoi chupi fees nahi.',
-      descEn: 'SafeSignal is completely free.\nNo hidden charges.',
-      color: Color(0xFF6A1B9A),
+      imagePath: 'assets/images/onboarding_3.png',
+      title: '24/7 Protection',
+      titleEn: 'Always Free & Safe',
+      desc: 'SMS, call aur background scan se\ncybercrime ko hamesha ke liye rokein.',
+      descEn: 'Prevent cyber fraud forever with SMS,\ncall and active background scan.',
+      color: Color(0xFF00C853),
     ),
   ];
 
   void _next() {
     if (_currentPage < _slides.length - 1) {
-      _controller.nextPage(duration: 300.ms, curve: Curves.easeInOut);
+      _controller.nextPage(duration: 400.ms, curve: Curves.easeInOutCubic);
     } else {
       context.go('/language');
     }
@@ -50,57 +50,107 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF060A12) : Colors.white;
+
     return Scaffold(
+      backgroundColor: bg,
       body: SafeArea(
         child: Column(
           children: [
+            Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: _currentPage < _slides.length - 1
+                    ? TextButton(
+                        onPressed: () => context.go('/language'),
+                        child: Text(
+                          'Skip',
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
+                      )
+                    : const SizedBox(height: 48),
+              ),
+            ),
             Expanded(
               child: PageView.builder(
                 controller: _controller,
                 onPageChanged: (i) => setState(() => _currentPage = i),
                 itemCount: _slides.length,
-                itemBuilder: (context, i) => _SlideWidget(slide: _slides[i]),
+                itemBuilder: (context, i) => _SlideWidget(slide: _slides[i], isDark: isDark),
               ),
             ),
-            // Dots
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                _slides.length,
-                (i) => AnimatedContainer(
-                  duration: 300.ms,
-                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
-                  width: _currentPage == i ? 24 : 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: _currentPage == i
-                        ? _slides[_currentPage].color
-                        : Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-            ),
+            // Indicator and Navigation Row
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: ElevatedButton(
-                onPressed: _next,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _slides[_currentPage].color,
-                  foregroundColor: Colors.white,
-                ),
-                child: Text(
-                  _currentPage == _slides.length - 1 ? 'Shuru Karein / Get Started' : 'Aage / Next',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Dot Indicators
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      _slides.length,
+                      (i) => AnimatedContainer(
+                        duration: 300.ms,
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        width: _currentPage == i ? 28 : 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: _currentPage == i
+                              ? _slides[_currentPage].color
+                              : (isDark ? Colors.white24 : Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  // Premium Button
+                  GestureDetector(
+                    onTap: _next,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            _slides[_currentPage].color,
+                            _slides[_currentPage].color.withValues(alpha: 0.8),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _slides[_currentPage].color.withValues(alpha: 0.3),
+                            blurRadius: 15,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          _currentPage == _slides.length - 1
+                              ? 'Shuru Karein / Get Started'
+                              : 'Aage / Next',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            if (_currentPage < _slides.length - 1)
-              TextButton(
-                onPressed: () => context.go('/language'),
-                child: const Text('Skip', style: TextStyle(color: Colors.grey)),
-              ),
-            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -110,68 +160,98 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
 class _SlideWidget extends StatelessWidget {
   final _OnboardingSlide slide;
-  const _SlideWidget({required this.slide});
+  final bool isDark;
+  const _SlideWidget({required this.slide, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 160,
-            height: 160,
-            decoration: BoxDecoration(
-              color: slide.color.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Expanded(
+          flex: 12,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F1724) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(32),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF202A3C) : const Color(0xFFEDF2F7),
+                  width: 1.5,
+                ),
+              ),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Image.asset(
+                    slide.imagePath,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ).animate().scale(duration: 400.ms, curve: Curves.easeOutCubic),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Expanded(
+          flex: 8,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              children: [
+                Text(
+                  slide.title,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    letterSpacing: -0.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ).animate().fadeIn(delay: 150.ms).slideY(begin: 0.1),
+                const SizedBox(height: 4),
+                Text(
+                  slide.titleEn,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade500,
+                  ),
+                  textAlign: TextAlign.center,
+                ).animate().fadeIn(delay: 200.ms),
+                const SizedBox(height: 16),
+                Text(
+                  slide.desc,
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.5,
+                    color: isDark ? Colors.white70 : Colors.grey.shade700,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                ).animate().fadeIn(delay: 250.ms).slideY(begin: 0.1),
+                const SizedBox(height: 4),
+                Text(
+                  slide.descEn,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade500,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                ).animate().fadeIn(delay: 300.ms),
+              ],
             ),
-            child: Center(
-              child: Text(slide.emoji, style: const TextStyle(fontSize: 80)),
-            ),
-          )
-              .animate()
-              .scale(duration: 500.ms, curve: Curves.elasticOut),
-          const SizedBox(height: 48),
-          Text(
-            slide.title,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: slide.color,
-                ),
-            textAlign: TextAlign.center,
-          ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2),
-          const SizedBox(height: 8),
-          Text(
-            slide.titleEn,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey),
-            textAlign: TextAlign.center,
-          ).animate().fadeIn(delay: 300.ms),
-          const SizedBox(height: 24),
-          Text(
-            slide.desc,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  height: 1.6,
-                  color: Colors.grey.shade700,
-                ),
-            textAlign: TextAlign.center,
-          ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.2),
-          const SizedBox(height: 8),
-          Text(
-            slide.descEn,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey.shade500,
-                ),
-            textAlign: TextAlign.center,
-          ).animate().fadeIn(delay: 500.ms),
-        ],
-      ),
+          ),
+        ),
+      ],
     );
   }
 }
 
 class _OnboardingSlide {
-  final String emoji;
+  final String imagePath;
   final String title;
   final String titleEn;
   final String desc;
@@ -179,7 +259,7 @@ class _OnboardingSlide {
   final Color color;
 
   const _OnboardingSlide({
-    required this.emoji,
+    required this.imagePath,
     required this.title,
     required this.titleEn,
     required this.desc,

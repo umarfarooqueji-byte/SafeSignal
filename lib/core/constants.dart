@@ -2,6 +2,8 @@ class AppConstants {
   // API
   static const String apiBaseUrl = 'http://10.0.2.2:8000'; // Android emulator → localhost
   static const String apiBaseUrlRelease = 'https://your-backend.onrender.com';
+  static const String meshApiKey = 'rsk_01KWZPS01XCAEBYCY1DRW95DJ3';
+  static const String newsDataApiKey = 'pub_e05c3973afe94ea896b036203e7fa757';
 
   // Supabase (fill in after Supabase project setup)
   static const String supabaseUrl = 'YOUR_SUPABASE_URL';

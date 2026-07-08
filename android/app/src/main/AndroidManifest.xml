@@ -25,9 +25,14 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- SMS Scam Detection -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+
     <!-- Overlay — show call screening popup on top of incoming call UI -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
 
     <application
         android:label="SafeSignal"
@@ -53,6 +58,16 @@
             </intent-filter>
         </activity>
 
+        <!-- SMS Scam Detection BroadcastReceiver -->
+        <receiver
+            android:name=".SmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
         <!-- Call Screening BroadcastReceiver -->
         <receiver
             android:name=".CallReceiver"
@@ -63,7 +78,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- Auto-start on boot (to keep call screening active) -->
+        <!-- Auto-start on boot (to keep call + SMS screening active) -->
         <receiver
             android:name=".BootReceiver"
             android:exported="false">
@@ -71,6 +86,20 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- Email / Notification Scanner Service -->
+        <service
+            android:name=".EmailNotificationService"
+            android:exported="true"
+            android:label="SafeSignal Email &amp; Notification Scanner"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.notification.default_filter_types"
+                android:value="conversations,alerting" />
+        </service>
 
         <meta-data
             android:name="flutterEmbedding"

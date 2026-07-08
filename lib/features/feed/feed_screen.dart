@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:dio/dio.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/constants.dart';
 import '../../data/models/alert_model.dart';
 
 class FeedScreen extends StatefulWidget {
@@ -40,28 +42,28 @@ class _FeedScreenState extends State<FeedScreen> {
 
     try {
       final dio = Dio();
-      // Google News RSS Search feed for Indian cyber security scams/frauds
-      final response = await dio.get<String>(
-        'https://news.google.com/rss/search?q=cybersecurity+scam+fraud+india&hl=en-IN&gl=IN&ceid=IN:en',
-        options: Options(
-          responseType: ResponseType.plain,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36',
-          },
-        ),
+      final response = await dio.get(
+        'https://newsdata.io/api/1/news',
+        queryParameters: {
+          'apikey': AppConstants.newsDataApiKey,
+          'q': 'scam OR fraud OR cybercrime OR cyber',
+          'country': 'in',
+          'language': 'en,hi',
+        },
       );
 
-      if (response.data != null && response.data!.contains('<item>')) {
-        final parsed = _RssParser.parse(response.data!);
+      if (response.statusCode == 200 && response.data['status'] == 'success') {
+        final List results = response.data['results'] ?? [];
+        final parsed = _NewsDataParser.parse(results);
         setState(() {
           _alerts = parsed;
           _loading = false;
         });
       } else {
-        throw Exception('Invalid RSS response format');
+        throw Exception('Failed to load news');
       }
     } catch (e) {
-      // Fallback to mock alerts if network call fails
+      debugPrint('News fetch error: $e');
       setState(() {
         _alerts = AlertModel.mockAlerts();
         _loading = false;
@@ -306,12 +308,32 @@ class _AlertCard extends StatelessWidget {
     return '${diff.inDays} din pehle';
   }
 
-  Future<void> _openNews() async {
+  Future<void> _openNews(BuildContext context) async {
     if (alert.sourceUrl == null) return;
     try {
       final uri = Uri.parse(alert.sourceUrl!);
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {}
+  }
+
+  void _shareNews(BuildContext context) {
+    final shareText = '🚨 ${alert.headline}\n\n${alert.summary.substring(0, alert.summary.length.clamp(0, 80))}...\n\n🔗 ${alert.sourceUrl ?? 'SafeSignal App'}\n\nStay safe with SafeSignal!';
+    Clipboard.setData(ClipboardData(text: shareText));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.white, size: 18),
+            SizedBox(width: 8),
+            Text('News link clipboard mein copy ho gaya!', style: TextStyle(fontWeight: FontWeight.w700)),
+          ],
+        ),
+        backgroundColor: const Color(0xFF2E7D32),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -411,9 +433,33 @@ class _AlertCard extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
+                    // Share button
+                    InkWell(
+                      onTap: () => _shareNews(context),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.share_outlined, size: 14, color: isDark ? Colors.white38 : Colors.black38),
+                            const SizedBox(width: 3),
+                            Text(
+                              'Share',
+                              style: TextStyle(
+                                color: isDark ? Colors.white38 : Colors.black38,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
                     // Read More action link
                     InkWell(
-                      onTap: _openNews,
+                      onTap: () => _openNews(context),
                       borderRadius: BorderRadius.circular(6),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -421,15 +467,15 @@ class _AlertCard extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'Poori News Padhein',
+                              'Poori Padhein',
                               style: TextStyle(
                                 color: color,
                                 fontWeight: FontWeight.w800,
-                                fontSize: 13,
+                                fontSize: 12,
                               ),
                             ),
-                            const SizedBox(width: 4),
-                            Icon(Icons.open_in_new, size: 14, color: color),
+                            const SizedBox(width: 3),
+                            Icon(Icons.open_in_new, size: 13, color: color),
                           ],
                         ),
                       ),
@@ -445,38 +491,25 @@ class _AlertCard extends StatelessWidget {
   }
 }
 
-// ─── Regex RSS Parser ─────────────────────────────────────────────────────────
-class _RssParser {
-  static List<AlertModel> parse(String xmlString) {
+// ─── JSON NewsData Parser ───────────────────────────────────────────────────
+class _NewsDataParser {
+  static List<AlertModel> parse(List results) {
     final list = <AlertModel>[];
-    final itemRegex = RegExp(r'<item>([\s\S]*?)</item>');
-    final titleRegex = RegExp(r'<title>([\s\S]*?)</title>');
-    final linkRegex = RegExp(r'<link>([\s\S]*?)</link>');
-    final dateRegex = RegExp(r'<pubDate>([\s\S]*?)</pubDate>');
-    final sourceRegex = RegExp(r'<source[^>]*>([\s\S]*?)</source>');
-
-    final matches = itemRegex.allMatches(xmlString);
     int count = 0;
-    for (final match in matches) {
-      final itemContent = match.group(1) ?? '';
 
-      final titleMatch = titleRegex.firstMatch(itemContent);
-      final linkMatch = linkRegex.firstMatch(itemContent);
-      final dateMatch = dateRegex.firstMatch(itemContent);
-      final sourceMatch = sourceRegex.firstMatch(itemContent);
+    for (final item in results) {
+      if (item is! Map) continue;
 
-      var title = titleMatch?.group(1) ?? 'Scam Alert';
-      title = _unescapeXml(title);
-
-      final link = linkMatch?.group(1) ?? '';
-      final dateStr = dateMatch?.group(1) ?? '';
-      final source = sourceMatch?.group(1) ?? 'Google News';
+      final title = item['title']?.toString() ?? 'Scam Alert';
+      final description = item['description']?.toString();
+      final link = item['link']?.toString();
+      final pubDateStr = item['pubDate']?.toString();
+      final source = item['source_id']?.toString() ?? 'News';
 
       DateTime? publishedAt;
-      if (dateStr.isNotEmpty) {
+      if (pubDateStr != null) {
         try {
-          // Parse typical RFC 822 format (e.g. "Tue, 07 Jul 2026 12:00:00 GMT")
-          publishedAt = DateTime.parse(dateStr);
+          publishedAt = DateTime.parse(pubDateStr);
         } catch (_) {}
       }
       publishedAt ??= DateTime.now().subtract(Duration(minutes: count * 20));
@@ -485,40 +518,31 @@ class _RssParser {
       var category = 'general';
       if (lowerTitle.contains('arrest')) {
         category = 'digital_arrest';
-      } else if (lowerTitle.contains('otp') || lowerTitle.contains('sms') || lowerTitle.contains('code') || lowerTitle.contains('sim')) {
+      } else if (lowerTitle.contains('otp') || lowerTitle.contains('sms') || lowerTitle.contains('sim') || lowerTitle.contains('link')) {
         category = 'otp';
-      } else if (lowerTitle.contains('invest') || lowerTitle.contains('trading') || lowerTitle.contains('earn') || lowerTitle.contains('money') || lowerTitle.contains('rupees')) {
+      } else if (lowerTitle.contains('invest') || lowerTitle.contains('trading') || lowerTitle.contains('earn') || lowerTitle.contains('money') || lowerTitle.contains('crypto')) {
         category = 'investment';
-      } else if (lowerTitle.contains('lottery') || lowerTitle.contains('won') || lowerTitle.contains('prize') || lowerTitle.contains('kbc') || lowerTitle.contains('crore')) {
+      } else if (lowerTitle.contains('lottery') || lowerTitle.contains('won') || lowerTitle.contains('prize') || lowerTitle.contains('kbc')) {
         category = 'lottery';
       }
 
       list.add(
         AlertModel(
-          id: 'news_${count++}',
+          id: item['article_id']?.toString() ?? 'news_${count++}',
           headline: title,
-          summary: 'Scam Alert from $source: Be aware and protect yourself. Click the link below to read full online coverage.',
-          sourceUrl: link.trim(),
+          summary: description != null && description.isNotEmpty
+              ? description
+              : 'Cybercrime alert from $source. Read the full news article below.',
+          sourceUrl: link,
           isTrending: count <= 3,
           publishedAt: publishedAt,
           category: category,
           isNew: count <= 6,
         ),
       );
-      if (list.length >= 25) break;
+      
+      count++;
     }
     return list;
-  }
-
-  static String _unescapeXml(String input) {
-    return input
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&apos;', "'")
-        .replaceAll('&#39;', "'")
-        .replaceAll('<![CDATA[', '')
-        .replaceAll(']]>', '');
   }
 }

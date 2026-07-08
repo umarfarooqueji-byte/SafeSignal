@@ -39,6 +39,14 @@ class MainActivity : FlutterActivity() {
                             result.success(true)
                         }
                     }
+                    "isNotificationListenerEnabled" -> {
+                        result.success(isNotificationListenerEnabled())
+                    }
+                    "openNotificationSettings" -> {
+                        val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
+                        startActivity(intent)
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -136,5 +144,21 @@ class MainActivity : FlutterActivity() {
         val intent = Intent(Settings.ACTION_WIFI_SETTINGS)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
         startActivity(intent)
+    }
+
+    // ─── Notification Listener Check ─────────────────────────────────────────
+    private fun isNotificationListenerEnabled(): Boolean {
+        val pkgName = packageName
+        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
+        if (!flat.isNullOrEmpty()) {
+            val names = flat.split(":")
+            for (name in names) {
+                val componentName = android.content.ComponentName.unflattenFromString(name)
+                if (componentName != null && componentName.packageName == pkgName) {
+                    return true
+                }
+            }
+        }
+        return false
     }
 }

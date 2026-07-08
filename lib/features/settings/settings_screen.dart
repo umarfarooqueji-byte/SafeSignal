@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../core/constants.dart';
 
 // Settings state
@@ -102,6 +105,15 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ],
             ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Background Protection Permissions
+          _SettingsSection(
+            title: 'Background Protection (Scam Shield)',
+            icon: Icons.shield_outlined,
+            child: const _ProtectionPermissionsWidget(),
           ),
 
           const SizedBox(height: 16),
@@ -329,3 +341,164 @@ class _AboutRow extends StatelessWidget {
     );
   }
 }
+
+// ─── Protection Permissions Widget ───────────────────────────────────────────
+class _ProtectionPermissionsWidget extends StatefulWidget {
+  const _ProtectionPermissionsWidget();
+
+  @override
+  State<_ProtectionPermissionsWidget> createState() => _ProtectionPermissionsWidgetState();
+}
+
+class _ProtectionPermissionsWidgetState extends State<_ProtectionPermissionsWidget> with WidgetsBindingObserver {
+  static const _channel = MethodChannel('com.safesignal/app_scanner');
+
+  bool _smsGranted = false;
+  bool _phoneGranted = false;
+  bool _overlayGranted = false;
+  bool _notificationGranted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkPermissions();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPermissions();
+    }
+  }
+
+  Future<void> _checkPermissions() async {
+    final sms = await Permission.sms.isGranted;
+    final phone = await Permission.phone.isGranted;
+    
+    bool overlay = false;
+    bool notification = false;
+
+    if (Platform.isAndroid) {
+      try {
+        overlay = await _channel.invokeMethod<bool>('requestOverlayPermission') ?? false;
+        notification = await _channel.invokeMethod<bool>('isNotificationListenerEnabled') ?? false;
+      } catch (e) {
+        debugPrint('Error checking native permissions: $e');
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _smsGranted = sms;
+        _phoneGranted = phone;
+        _overlayGranted = overlay;
+        _notificationGranted = notification;
+      });
+    }
+  }
+
+  Future<void> _requestSms() async {
+    final status = await Permission.sms.request();
+    if (status.isPermanentlyDenied) {
+      openAppSettings();
+    }
+    _checkPermissions();
+  }
+
+  Future<void> _requestPhone() async {
+    final status = await Permission.phone.request();
+    if (status.isPermanentlyDenied) {
+      openAppSettings();
+    }
+    _checkPermissions();
+  }
+
+  Future<void> _requestNotification() async {
+    if (Platform.isAndroid) {
+      try {
+        await _channel.invokeMethod('openNotificationSettings');
+      } catch (e) {
+        debugPrint('Error opening notification settings: $e');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _PermissionRow(
+          title: 'SMS Shield',
+          subtitle: 'Scans incoming SMS for phishing links',
+          isGranted: _smsGranted,
+          onTap: _requestSms,
+        ),
+        const Divider(height: 1),
+        _PermissionRow(
+          title: 'Call Shield (State)',
+          subtitle: 'Detects scam caller IDs',
+          isGranted: _phoneGranted,
+          onTap: _requestPhone,
+        ),
+        const Divider(height: 1),
+        _PermissionRow(
+          title: 'Call Overlay (Popup)',
+          subtitle: 'Shows warning on top of incoming calls',
+          isGranted: _overlayGranted,
+          onTap: () async {
+            if (Platform.isAndroid && !_overlayGranted) {
+              await _channel.invokeMethod('requestOverlayPermission');
+            }
+          },
+        ),
+        const Divider(height: 1),
+        _PermissionRow(
+          title: 'Email/Notification Shield',
+          subtitle: 'Scans email notifications for scams',
+          isGranted: _notificationGranted,
+          onTap: _requestNotification,
+        ),
+      ],
+    );
+  }
+}
+
+class _PermissionRow extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool isGranted;
+  final VoidCallback onTap;
+
+  const _PermissionRow({
+    required this.title,
+    required this.subtitle,
+    required this.isGranted,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+      trailing: ElevatedButton(
+        onPressed: isGranted ? null : onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isGranted ? Colors.green.shade100 : Theme.of(context).colorScheme.primary,
+          foregroundColor: isGranted ? Colors.green.shade800 : Colors.white,
+          elevation: 0,
+        ),
+        child: Text(isGranted ? 'Active' : 'Enable'),
+      ),
+    );
+  }
+}
+

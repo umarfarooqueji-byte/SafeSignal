@@ -21,9 +21,9 @@ class AppTheme {
   static const Color safeDark     = Color(0xFF00200A);
 
   // ─── Light Surface ────────────────────────────────────────────
-  static const Color lightBg      = Color(0xFFF5F7FF);
+  static const Color lightBg      = Color(0xFFFFFFFF);
   static const Color lightCard    = Color(0xFFFFFFFF);
-  static const Color lightCardAlt = Color(0xFFEEF2FF);
+  static const Color lightCardAlt = Color(0xFFF5F7FF);
 
   // ─── Dark Surface ─────────────────────────────────────────────
   static const Color darkBg       = Color(0xFF06090F);
@@ -84,27 +84,31 @@ class AppTheme {
     fontFamily: 'Roboto',
     cardTheme: CardThemeData(
       color: lightCard,
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      shadowColor: Colors.transparent,
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: const BorderSide(color: Color(0xFFF1F4F9), width: 1.2),
+      ),
+      shadowColor: const Color(0xFF0A1020).withValues(alpha: 0.04),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         minimumSize: const Size.fromHeight(56),
         backgroundColor: primary,
         foregroundColor: Colors.white,
-        elevation: 0,
+        elevation: 6,
+        shadowColor: primary.withValues(alpha: 0.25),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: 0.3),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 0.2),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: lightCard,
+      fillColor: const Color(0xFFF8FAFC),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFFDDE3F0), width: 1.5),
+        borderSide: const BorderSide(color: Color(0xFFE8EEF5), width: 1.2),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -117,19 +121,19 @@ class AppTheme {
       elevation: 0,
       scrolledUnderElevation: 0,
       backgroundColor: Colors.transparent,
-      foregroundColor: Color(0xFF0D1117),
+      foregroundColor: Color(0xFF0F172A),
       titleTextStyle: TextStyle(
-        fontSize: 22,
-        fontWeight: FontWeight.w800,
-        color: Color(0xFF0D1117),
+        fontSize: 20,
+        fontWeight: FontWeight.w900,
+        color: Color(0xFF0F172A),
         letterSpacing: -0.3,
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: lightCard,
-      indicatorColor: primary.withValues(alpha: 0.12),
+      indicatorColor: primary.withValues(alpha: 0.1),
       labelTextStyle: WidgetStateProperty.all(
-        const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+        const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
       ),
       elevation: 0,
     ),

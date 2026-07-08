@@ -14,6 +14,8 @@ import '../../features/settings/settings_screen.dart';
 import '../../features/url_scanner/url_scanner_screen.dart';
 import '../../features/wifi_scanner/wifi_scanner_screen.dart';
 import '../../features/app_scanner/app_scanner_screen.dart';
+import '../../features/home/otp_guard_screen.dart';
+import '../../features/home/call_shield_screen.dart';
 import '../../data/models/verdict_model.dart';
 import '../constants.dart';
 
@@ -50,6 +52,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/app-scanner',
         builder: (context, state) => const AppScannerScreen(),
+      ),
+      GoRoute(
+        path: '/otp-guard',
+        builder: (context, state) => const OtpGuardScreen(),
+      ),
+      GoRoute(
+        path: '/call-shield',
+        builder: (context, state) => const CallShieldScreen(),
       ),
       GoRoute(
         path: '/verdict',
@@ -107,10 +117,10 @@ class _SplashRedirectScreenState extends State<SplashRedirectScreen>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 1000),
     );
-    _scaleAnim = CurvedAnimation(parent: _controller, curve: Curves.elasticOut)
-        .drive(Tween(begin: 0.5, end: 1.0));
+    _scaleAnim = CurvedAnimation(parent: _controller, curve: Curves.easeOutBack)
+        .drive(Tween(begin: 0.6, end: 1.0));
     _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeIn)
         .drive(Tween(begin: 0.0, end: 1.0));
     _controller.forward();
@@ -124,7 +134,7 @@ class _SplashRedirectScreenState extends State<SplashRedirectScreen>
   }
 
   Future<void> _redirect() async {
-    await Future.delayed(const Duration(milliseconds: 2000));
+    await Future.delayed(const Duration(milliseconds: 2500));
     if (!mounted) return;
     final prefs = await SharedPreferences.getInstance();
     final onboardingDone =
@@ -139,61 +149,108 @@ class _SplashRedirectScreenState extends State<SplashRedirectScreen>
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: cs.primary,
-      body: Center(
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return FadeTransition(
-              opacity: _fadeAnim,
-              child: ScaleTransition(
-                scale: _scaleAnim,
-                child: child,
-              ),
-            );
-          },
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 110,
-                height: 110,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(28),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF060A12), Color(0xFF0F1B35), Color(0xFF14244B)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Center(
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return FadeTransition(
+                opacity: _fadeAnim,
+                child: ScaleTransition(
+                  scale: _scaleAnim,
+                  child: child,
                 ),
-                child: const Icon(Icons.shield_outlined, size: 64, color: Colors.white),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'SafeSignal',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1,
+              );
+            },
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Glowing shield container
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2979FF), Color(0xFF7C4DFF)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF2979FF).withValues(alpha: 0.5),
+                        blurRadius: 30,
+                        spreadRadius: 2,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.verified_user_rounded,
+                      size: 60,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Aapka Digital Suraksha Kawach',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.8),
-                  fontSize: 15,
+                const SizedBox(height: 32),
+                RichText(
+                  text: const TextSpan(
+                    children: [
+                      TextSpan(
+                        text: 'Safe',
+                        style: TextStyle(
+                          fontSize: 38,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF2979FF),
+                          letterSpacing: -1.5,
+                        ),
+                      ),
+                      TextSpan(
+                        text: 'Signal',
+                        style: TextStyle(
+                          fontSize: 38,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: -1.5,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 48),
-              SizedBox(
-                width: 36,
-                height: 36,
-                child: CircularProgressIndicator(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  strokeWidth: 3,
+                const SizedBox(height: 8),
+                Text(
+                  'Aapka Digital Suraksha Kawach',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.3,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 64),
+                // Premium thin loading indicator
+                SizedBox(
+                  width: 140,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: const LinearProgressIndicator(
+                      color: Color(0xFF2979FF),
+                      backgroundColor: Colors.white10,
+                      minHeight: 3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

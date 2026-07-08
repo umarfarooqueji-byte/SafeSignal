@@ -592,12 +592,21 @@ class _AppCardState extends State<_AppCard> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 2),
                       Text(
                         app.starRating.toStringAsFixed(1),
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w900,
+                          color: rc,
+                          height: 1.1,
+                        ),
+                      ),
+                      Text(
+                        app.riskLabel.split(' ').last, // just emoji + word
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
                           color: rc,
                         ),
                       ),
@@ -724,27 +733,70 @@ class AppInfo {
     required this.riskScore, required this.riskLevel, required this.riskReasons,
   });
 
-  // 0-100 riskScore → 0-5 star (inverted)
-  double get starRating => ((100 - riskScore) / 20).clamp(0.0, 5.0);
+  /// Maps 0-100 risk score to 1.0-5.0 stars (never 0)
+  /// riskScore=0 → 5.0★ (completely safe)
+  /// riskScore=25 → 4.0★ (low risk)
+  /// riskScore=50 → 3.0★ (moderate)
+  /// riskScore=75 → 2.0★ (high risk)
+  /// riskScore=100 → 1.0★ (critical — but still shows 1, not 0)
+  double get starRating => (5.0 - (riskScore * 4.0 / 100.0)).clamp(1.0, 5.0);
+
+  String get riskLabel {
+    final r = starRating;
+    if (r >= 4.5) return 'Bilkul Safe ✅';
+    if (r >= 3.5) return 'Kam Risk 🟡';
+    if (r >= 2.5) return 'Moderate Risk 🟠';
+    if (r >= 1.5) return 'High Risk 🔴';
+    return 'Critical Risk ⛔';
+  }
 }
 
 class RiskEngine {
+  // ── Calibrated permission weights (lower = more realistic spread) ──────────
+  // These are carefully tuned so that:
+  // - System apps (no risky perms) → 5.0★
+  // - WhatsApp/Instagram (many legitimate perms) → ~2.5-3.5★
+  // - Unknown app with SMS+location+accessibility → ~1.0-1.5★
   static const _dangerPerms = {
-    'android.permission.RECORD_AUDIO': ('🎤 Microphone', 30, 'App awaaz sun sakta hai'),
-    'android.permission.CAMERA': ('📷 Camera', 20, 'App camera use kar sakta hai'),
-    'android.permission.READ_CONTACTS': ('👥 Contacts', 25, 'App contacts padh sakta hai'),
-    'android.permission.READ_SMS': ('💬 SMS Read', 35, 'App SMS padh sakta hai'),
-    'android.permission.SEND_SMS': ('📤 SMS Send', 30, 'App SMS bhej sakta hai'),
-    'android.permission.ACCESS_FINE_LOCATION': ('📍 Location', 25, 'App exact location track karta hai'),
-    'android.permission.ACCESS_BACKGROUND_LOCATION': ('📍 Location 24/7', 40, 'App background mein bhi location track karta hai'),
-    'android.permission.READ_CALL_LOG': ('📞 Call Logs', 35, 'App call history padh sakta hai'),
-    'android.permission.PROCESS_OUTGOING_CALLS': ('📞 Call Intercept', 40, 'App calls intercept kar sakta hai'),
-    'android.permission.GET_ACCOUNTS': ('🔑 Accounts', 20, 'App aapke accounts dekh sakta hai'),
-    'android.permission.SYSTEM_ALERT_WINDOW': ('🪟 Overlay', 30, 'App doosri apps ke upar dikhta hai'),
-    'android.permission.BIND_ACCESSIBILITY_SERVICE': ('♿ Accessibility', 45, 'Bahut risky — screen monitor kar sakta hai'),
-    'android.permission.REQUEST_INSTALL_PACKAGES': ('📦 Install Apps', 35, 'App doosri apps install kar sakta hai'),
-    'android.permission.READ_PHONE_STATE': ('📱 Phone State', 20, 'App phone number aur IMEI padh sakta hai'),
-    'android.permission.WRITE_SETTINGS': ('⚙️ System Settings', 25, 'App system settings change kar sakta hai'),
+    'android.permission.RECORD_AUDIO':              ('🎤 Microphone',        12, 'App background mein awaaz record kar sakta hai'),
+    'android.permission.CAMERA':                    ('📷 Camera',             8, 'App bina bataye photo le sakta hai'),
+    'android.permission.READ_CONTACTS':             ('👥 Contacts',          10, 'App aapki puri contact list padh sakta hai'),
+    'android.permission.READ_SMS':                  ('💬 SMS Read',          18, 'App aapke SMS padh sakta hai — OTP bhi!'),
+    'android.permission.SEND_SMS':                  ('📤 SMS Send',          15, 'App aapki taraf se SMS bhej sakta hai'),
+    'android.permission.RECEIVE_SMS':               ('📩 SMS Receive',        12, 'App incoming SMS intercept kar sakta hai'),
+    'android.permission.ACCESS_FINE_LOCATION':      ('📍 Exact Location',    12, 'App aapki exact GPS location track karta hai'),
+    'android.permission.ACCESS_BACKGROUND_LOCATION':('📍 24/7 Location',     22, '⚠️ Background mein bhi location track — bahut risky'),
+    'android.permission.READ_CALL_LOG':             ('📞 Call History',      15, 'App aapki call history dekh sakta hai'),
+    'android.permission.PROCESS_OUTGOING_CALLS':    ('📞 Call Intercept',    18, 'App aapke calls ko intercept kar sakta hai'),
+    'android.permission.GET_ACCOUNTS':              ('🔑 Device Accounts',    8, 'App phone mein saved accounts dekh sakta hai'),
+    'android.permission.SYSTEM_ALERT_WINDOW':       ('🪟 Screen Overlay',    14, 'App doosri apps ke upar dikhne ki permission hai'),
+    'android.permission.BIND_ACCESSIBILITY_SERVICE':('♿ Accessibility',      28, '🚨 BAHUT RISKY — screen pe sab kuch dekh sakta hai'),
+    'android.permission.REQUEST_INSTALL_PACKAGES':  ('📦 App Install',       18, 'App kisi bhi apk ko install kar sakta hai'),
+    'android.permission.READ_PHONE_STATE':          ('📱 Phone ID/IMEI',      8, 'App aapka phone number aur IMEI padh sakta hai'),
+    'android.permission.WRITE_SETTINGS':            ('⚙️ System Settings',   12, 'App phone ki system settings change kar sakta hai'),
+    'android.permission.WRITE_EXTERNAL_STORAGE':    ('💾 Storage Write',      8, 'App aapki files likh sakta hai'),
+    'android.permission.READ_EXTERNAL_STORAGE':     ('📂 Storage Read',       6, 'App aapki files padh sakta hai'),
+  };
+
+  // Well-known legitimate apps — give 40% score reduction
+  // These apps have many permissions by design (messaging, social, banking)
+  static const _knownLegitimate = {
+    'com.whatsapp', 'com.whatsapp.w4b',
+    'com.facebook.katana', 'com.instagram.android', 'com.facebook.lite',
+    'com.google.android.gm', 'com.google.android.apps.messaging',
+    'com.android.chrome', 'com.google.android.googlequicksearchbox',
+    'com.spotify.music', 'com.gaana', 'com.jiosaavn',
+    'com.phonepe.app', 'net.one97.paytm', 'com.google.android.apps.tachyon',
+    'in.amazon.mShop.android.shopping', 'com.flipkart.android',
+    'com.myntra.android', 'com.swiggy.android', 'app.zomato',
+    'com.netflix.mediaclient', 'com.google.android.youtube',
+    'com.snapchat.android', 'com.twitter.android', 'com.linkedin.android',
+    'com.telegram.messenger', 'org.telegram.messenger',
+    'com.microsoft.teams', 'com.zoom.videomeetings', 'us.zoom.videomeetings',
+    'com.airtel.mcare', 'com.jio.myjio', 'com.vi.app',
+    'com.truecaller',
+    'com.google.android.apps.photos', 'com.google.android.maps',
+    'com.amazon.mShop.android', 'com.google.android.keep',
   };
 
   static AppInfo analyze(Map<String, dynamic> raw) {
@@ -754,35 +806,44 @@ class RiskEngine {
     final isSystem = raw['isSystem'] as bool? ?? false;
     final version = raw['versionName'] as String? ?? '';
 
+    final pkgLower = pkg.toLowerCase();
+    final isKnownLegit = _knownLegitimate.contains(pkg) || isSystem;
+
     int score = 0;
     final reasons = <String>[];
 
     for (final perm in perms) {
       final info = _dangerPerms[perm];
       if (info != null) {
-        score += info.$2;
+        // Known legitimate apps get 40% weight reduction per permission
+        final weight = isKnownLegit ? (info.$2 * 0.6).round() : info.$2;
+        score += weight;
         reasons.add('${info.$1}: ${info.$3}');
       }
     }
 
-    if (perms.length > 25) {
-      score += 15;
-      reasons.add('📋 Bahut zyada permissions (${perms.length}) le raha hai');
+    // Penalty for excessive permission count in unknown apps
+    if (perms.length > 30 && !isKnownLegit) {
+      score += 12;
+      reasons.add('📋 ${perms.length} permissions — zyada uthane ki wajah bataiye');
     }
 
-    final pkgLower = pkg.toLowerCase();
-    if (['spyware', 'tracker', 'hack', 'spy', 'stealth'].any((p) => pkgLower.contains(p))) {
-      score += 50;
-      reasons.add('⚠️ Package naam suspicious hai');
+    // Suspicious package name keywords
+    if (['spyware', 'tracker', 'hack', 'spy', 'stealth', 'keylog']
+        .any((p) => pkgLower.contains(p))) {
+      score += 40;
+      reasons.insert(0, '⚠️ Package naam suspicious lag raha hai');
     }
 
-    score = score.clamp(0, 100);
+    // Score cap: max 80 for legit apps (so they always get ≥1.8★)
+    // max 95 for unknown suspicious apps (so they get ≥1.2★)
+    score = isKnownLegit ? score.clamp(0, 80) : score.clamp(0, 95);
 
-    final level = score >= 70
+    final level = score >= 68
         ? RiskLevel.critical
         : score >= 50
             ? RiskLevel.high
-            : score >= 30
+            : score >= 32
                 ? RiskLevel.medium
                 : score >= 15
                     ? RiskLevel.low

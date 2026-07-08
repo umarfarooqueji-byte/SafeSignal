@@ -10,11 +10,12 @@ import android.os.Build
 import android.provider.Telephony
 import androidx.core.app.NotificationCompat
 import java.util.Locale
+import java.util.regex.Pattern
 
 class SmsReceiver : BroadcastReceiver() {
     companion object {
         private const val CHANNEL_ID = "safesignal_sms_alerts"
-        private const val NOTIFICATION_ID = 2002
+        private const val NOTIFICATION_ID_BASE = 2002
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -25,11 +26,9 @@ class SmsReceiver : BroadcastReceiver() {
             for (msg in messages) {
                 val body = msg.messageBody ?: continue
                 val sender = msg.originatingAddress ?: "Unknown"
-
-                // Analyze SMS body
-                val analysis = analyzeSms(body)
+                val analysis = analyzeSms(body, sender)
                 if (analysis.isSuspicious) {
-                    showScamNotification(context, sender, body, analysis.reason)
+                    showScamNotification(context, sender, body, analysis)
                 }
             }
         } catch (e: Exception) {
@@ -37,38 +36,138 @@ class SmsReceiver : BroadcastReceiver() {
         }
     }
 
-    private class SmsAnalysis(val isSuspicious: Boolean, val reason: String)
+    // ─── Analysis Result ─────────────────────────────────────────────────────
+    private data class SmsAnalysis(
+        val isSuspicious: Boolean,
+        val verdict: String,        // "SCAM" | "PHISHING" | "CAUTION"
+        val confidence: Int,        // 0-100
+        val reason: String,
+        val category: String        // human-readable category in Hinglish
+    )
 
-    private fun analyzeSms(body: String): SmsAnalysis {
+    // ─── Core Analysis Engine ─────────────────────────────────────────────────
+    private fun analyzeSms(body: String, sender: String): SmsAnalysis {
         val lower = body.lowercase(Locale.getDefault())
+        var score = 0
+        val detectedReasons = mutableListOf<String>()
 
-        val scamKeywords = listOf(
-            "arrest", "cbi", "police custody", "court warrant", "narcotics division",
-            "electricity bill update", "power connection cut", "electricity cut",
-            "won lucky draw", "kbc lottery", "won prize", "crore", "lakhs lucky",
-            "account blocked", "suspend your card", "kyc details expired", "update pan card",
-            "part time job", "earn money from home", "daily salary", "telegram like job",
-            "unknown transaction", "deducted rupees", "transfer success"
+        // ── TIER 1: High-confidence fraud patterns (each +35 score) ──────────
+        val tier1 = mapOf(
+            "digital arrest" to "Digital Arrest scam",
+            "arrested" to "Arrest threat",
+            "cbi officer" to "Fake CBI officer",
+            "narcotics" to "Fake narcotics case",
+            "police custody" to "Fake police custody threat",
+            "court warrant" to "Fake court warrant",
+            "money laundering" to "Money laundering scam",
+            "cyber crime notice" to "Fake cybercrime notice",
+            "ed notice" to "Fake ED notice",
+            "income tax notice" to "Fake IT notice",
+            "kbc lottery" to "KBC lottery scam",
+            "won lucky draw" to "Lucky draw fraud",
+            "won prize" to "Prize scam",
+            "claim your reward" to "Reward scam",
+            "electricity cut" to "Electricity bill scam",
+            "bijli katne" to "Bijli katne scam",
+            "aadhaar blocked" to "Aadhaar block scam",
+            "sim card blocked" to "SIM block scam",
+            "kyc expire" to "KYC expiry scam",
+            "update pan card" to "PAN card scam",
+            "account suspend" to "Account suspension scam",
+            "part time job" to "Fake job fraud",
+            "telegram like job" to "Telegram like-job scam",
+            "earn from home" to "Work-from-home fraud",
+            "daily salary" to "Daily salary scam",
+            "transfer success rs" to "Fake transaction alert",
+            "unknown transaction" to "Fake transaction alert",
+            "otp share" to "OTP phishing",
+            "share otp" to "OTP phishing"
         )
 
-        for (kw in scamKeywords) {
+        for ((keyword, reason) in tier1) {
+            if (lower.contains(keyword)) {
+                score += 35
+                detectedReasons.add(reason)
+            }
+        }
+
+        // ── TIER 2: Medium-confidence scam indicators (each +20 score) ───────
+        val tier2 = listOf(
+            "click here", "tap here", "click link", "click now",
+            "verify account", "verify your", "update account",
+            "account blocked", "card blocked", "bank account block",
+            "crore", "lakh prize", "won rs", "gift rs",
+            "immediate action", "last chance", "expires today",
+            "debit card", "credit card fraud", "upi fraud",
+            "refund amount", "cashback credited"
+        )
+        for (kw in tier2) {
             if (lower.contains(kw)) {
-                return SmsAnalysis(true, "Scam Indicator detected: '$kw'")
+                score += 20
+                detectedReasons.add("Urgency/pressure tactic: '$kw'")
+                break // count only once for tier2
             }
         }
 
-        // Suspicious link + urgent words
-        if (lower.contains("http") || lower.contains(".ru/") || lower.contains(".apk") || lower.contains("bit.ly") || lower.contains("tinyurl")) {
-            val urgentWords = listOf("urgent", "immediately", "block", "verify", "claim", "last date")
-            if (urgentWords.any { lower.contains(it) }) {
-                return SmsAnalysis(true, "Suspicious link with urgent call-to-action")
-            }
+        // ── TIER 3: Suspicious links + urgency combo (each +30 score) ────────
+        val hasLink = lower.contains("http") || lower.contains("www.")
+            || lower.contains(".apk") || lower.contains("bit.ly")
+            || lower.contains("tinyurl") || lower.contains(".ru/")
+            || lower.contains(".xyz/") || lower.contains(".tk/")
+        val urgentWords = listOf("urgent", "immediately", "block", "verify", "claim", "last date", "expire", "today only")
+        val hasUrgency = urgentWords.any { lower.contains(it) }
+
+        if (hasLink && hasUrgency) {
+            score += 30
+            detectedReasons.add("Suspicious link with urgent call-to-action")
+        } else if (hasLink && lower.contains(".apk")) {
+            score += 40
+            detectedReasons.add("APK download link — highly dangerous!")
         }
 
-        return SmsAnalysis(false, "")
+        // ── TIER 4: Sender number analysis ───────────────────────────────────
+        val cleanSender = sender.replace(Regex("[\\s\\-()]+"), "")
+        if (cleanSender.startsWith("+") && !cleanSender.startsWith("+91")) {
+            score += 15
+            detectedReasons.add("International number sender")
+        }
+        // If sender is a 10-digit number (not short code), slight risk
+        if (cleanSender.matches(Regex("\\d{10}"))) {
+            // Normal mobile number — no change
+        }
+
+        // ── SAFE INDICATORS (reduce score) ───────────────────────────────────
+        val safeIndicators = listOf(
+            "your transaction of", "credited to your", "debited from your",
+            "upi ref no", "upi ref", "neft transfer", "imps transfer",
+            "hdfc bank", "sbi bank", "axis bank", "icici bank",
+            "do not share otp with anyone", "never share otp"
+        )
+        val isSafeContext = safeIndicators.any { lower.contains(it) }
+        if (isSafeContext) {
+            score = (score * 0.4).toInt() // Heavily reduce score for legitimate banking messages
+        }
+
+        // ── Verdict ───────────────────────────────────────────────────────────
+        return when {
+            score >= 60 -> SmsAnalysis(
+                true, "SCAM", score.coerceAtMost(99),
+                detectedReasons.take(2).joinToString("; "),
+                "Scam SMS Detected"
+            )
+            score in 35..59 -> SmsAnalysis(
+                true, "CAUTION", score,
+                detectedReasons.firstOrNull() ?: "Suspicious content found",
+                "Suspicious SMS"
+            )
+            else -> SmsAnalysis(false, "SAFE", score, "", "")
+        }
     }
 
-    private fun showScamNotification(context: Context, sender: String, body: String, reason: String) {
+    // ─── Notification Builder ─────────────────────────────────────────────────
+    private fun showScamNotification(
+        context: Context, sender: String, body: String, analysis: SmsAnalysis
+    ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -77,7 +176,10 @@ class SmsReceiver : BroadcastReceiver() {
                 "SafeSignal SMS Scam Shield",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Notifies when a phishing/scam message is received"
+                description = "Real-time SMS scam detection alerts"
+                enableVibration(true)
+                enableLights(true)
+                lightColor = android.graphics.Color.RED
             }
             nm.createNotificationChannel(channel)
         }
@@ -88,17 +190,40 @@ class SmsReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val emoji = when (analysis.verdict) {
+            "SCAM" -> "\uD83D\uDD34"
+            "CAUTION" -> "⚠\uFE0F"
+            else -> "\uD83D\uDD35"
+        }
+
+        val confidenceStr = "${analysis.confidence}% confidence"
+        val safetyTip = when (analysis.verdict) {
+            "SCAM" -> "Kisi bhi link pe click mat karein aur na hi OTP/bank details share karein. 1930 pe call karein."
+            else -> "Is message ke sath sawdhan rahein. Koi bhi link ya attachment pe click karne se pehle verify karein."
+        }
+
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_warning)
-            .setContentTitle("🔴 SCAM ALERT: $sender")
-            .setContentText("Khatra detected: $reason")
-            .setStyle(NotificationCompat.BigTextStyle()
-                .bigText("SafeSignal detected a scam SMS from $sender:\n\n\"$body\"\n\n⚠️ Is message ke links pe click mat karein aur na hi kisi se OTP share karein!"))
+            .setContentTitle("$emoji ${analysis.category} — $sender")
+            .setContentText(analysis.reason)
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .setBigContentTitle("$emoji SafeSignal: ${analysis.verdict} SMS ($confidenceStr)")
+                    .bigText(
+                        "From: $sender\n\n" +
+                        "Message: \"${body.take(200)}${if (body.length > 200) "..." else ""}\"\n\n" +
+                        "⚠\uFE0F Reason: ${analysis.reason}\n\n" +
+                        "\uD83D\uDEA8 $safetyTip"
+                    )
+                    .setSummaryText("SafeSignal Scam Shield")
+            )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+            .setColor(if (analysis.verdict == "SCAM") android.graphics.Color.RED else android.graphics.Color.parseColor("#FF6F00"))
             .build()
 
-        nm.notify(NOTIFICATION_ID + sender.hashCode(), notification)
+        nm.notify(NOTIFICATION_ID_BASE + sender.hashCode(), notification)
     }
 }
