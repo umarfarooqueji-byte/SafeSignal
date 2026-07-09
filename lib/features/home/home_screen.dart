@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -52,7 +53,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final lang = ref.watch(settingsProvider).language;
-    final bg = isDark ? const Color(0xFF060A12) : const Color(0xFFF0F4FF);
+    final bg = isDark ? const Color(0xFF060A12) : Colors.white;
 
     return Scaffold(
       backgroundColor: bg,
@@ -172,9 +173,9 @@ class _TopBar extends StatelessWidget {
               ],
             ),
           ),
-          _GlassIconBtn(Icons.notifications_outlined, isDark, () {}),
+          _GlassIconBtn(CupertinoIcons.bell, isDark, () {}),
           const SizedBox(width: 8),
-          _GlassIconBtn(Icons.settings_outlined, isDark, () => GoRouter.of(context).go('/settings')),
+          _GlassIconBtn(CupertinoIcons.gear_alt, isDark, () => GoRouter.of(context).go('/settings')),
         ],
       ),
     ).animate().fadeIn().slideY(begin: -0.08);
@@ -243,43 +244,46 @@ class _PremiumShieldHero extends StatelessWidget {
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF06101F), Color(0xFF0A1A38), Color(0xFF0D2050)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: isDark ? const Color(0xFF0D1B35) : Colors.white,
           borderRadius: BorderRadius.circular(28),
+          border: Border.all(
+            color: isDark
+                ? const Color(0xFF2979FF).withValues(alpha: 0.2)
+                : const Color(0xFF2979FF).withValues(alpha: 0.12),
+            width: 1.5,
+          ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF2979FF).withValues(alpha: 0.35),
-              blurRadius: 40,
-              offset: const Offset(0, 16),
-              spreadRadius: -8,
+              color: const Color(0xFF2979FF).withValues(alpha: isDark ? 0.25 : 0.08),
+              blurRadius: 32,
+              offset: const Offset(0, 12),
+              spreadRadius: -4,
             ),
-            BoxShadow(
-              color: const Color(0xFF7C4DFF).withValues(alpha: 0.15),
-              blurRadius: 60,
-              offset: const Offset(0, 20),
-            ),
+            if (!isDark)
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
           ],
         ),
         child: Stack(
           children: [
-            // Rotating ring background
+            // Subtle circuit pattern background
             Positioned.fill(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(28),
                 child: AnimatedBuilder(
                   animation: rotateCtrl,
                   builder: (context, child) => CustomPaint(
-                    painter: _CircuitPainter(rotateCtrl.value),
+                    painter: _CircuitPainter(rotateCtrl.value, isDark: isDark),
                   ),
                 ),
               ),
             ),
             // Content
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 26),
               child: Column(
                 children: [
                   // Shield animation
@@ -290,14 +294,13 @@ class _PremiumShieldHero extends StatelessWidget {
                       return Stack(
                         alignment: Alignment.center,
                         children: [
-                          // Outer ring
                           Container(
                             width: 140 * pulse,
                             height: 140 * pulse,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: const Color(0xFF2979FF).withValues(alpha: 0.1 * pulse),
+                                color: const Color(0xFF2979FF).withValues(alpha: isDark ? 0.12 * pulse : 0.08 * pulse),
                                 width: 1,
                               ),
                             ),
@@ -308,12 +311,11 @@ class _PremiumShieldHero extends StatelessWidget {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: const Color(0xFF2979FF).withValues(alpha: 0.15 * pulse),
+                                color: const Color(0xFF2979FF).withValues(alpha: isDark ? 0.18 * pulse : 0.12 * pulse),
                                 width: 1.5,
                               ),
                             ),
                           ),
-                          // Inner glow
                           Container(
                             width: 90 * pulse,
                             height: 90 * pulse,
@@ -321,7 +323,7 @@ class _PremiumShieldHero extends StatelessWidget {
                               shape: BoxShape.circle,
                               gradient: RadialGradient(
                                 colors: [
-                                  const Color(0xFF2979FF).withValues(alpha: 0.25 * pulse),
+                                  const Color(0xFF2979FF).withValues(alpha: isDark ? 0.25 * pulse : 0.1 * pulse),
                                   Colors.transparent,
                                 ],
                               ),
@@ -340,9 +342,9 @@ class _PremiumShieldHero extends StatelessWidget {
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF2979FF).withValues(alpha: 0.6),
-                                  blurRadius: 24,
-                                  spreadRadius: 2,
+                                  color: const Color(0xFF2979FF).withValues(alpha: 0.45),
+                                  blurRadius: 20,
+                                  spreadRadius: 1,
                                 ),
                               ],
                             ),
@@ -361,10 +363,10 @@ class _PremiumShieldHero extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF4CAF50).withValues(alpha: 0.15),
+                      color: const Color(0xFF4CAF50).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(50),
                       border: Border.all(
-                        color: const Color(0xFF4CAF50).withValues(alpha: 0.4),
+                        color: const Color(0xFF4CAF50).withValues(alpha: 0.35),
                       ),
                     ),
                     child: Row(
@@ -402,7 +404,9 @@ class _PremiumShieldHero extends StatelessWidget {
                         : 'Your phone is under\nSafeSignal AI protection 🔒',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.6)
+                          : Colors.black.withValues(alpha: 0.45),
                       fontSize: 13,
                       height: 1.55,
                     ),
@@ -415,63 +419,26 @@ class _PremiumShieldHero extends StatelessWidget {
                         value: '98%',
                         label: lang == 'hi' ? 'Scam\nDetection' : 'Scam\nDetection',
                         color: const Color(0xFF4CAF50),
-                        icon: Icons.gpp_good_outlined,
+                        icon: CupertinoIcons.shield_lefthalf_fill,
+                        isDark: isDark,
                       ),
                       const SizedBox(width: 10),
                       _StatChip(
                         value: '24/7',
                         label: lang == 'hi' ? 'SMS\nWatchdog' : 'SMS\nWatchdog',
                         color: const Color(0xFF2979FF),
-                        icon: Icons.radar,
+                        icon: CupertinoIcons.antenna_radiowaves_left_right,
+                        isDark: isDark,
                       ),
                       const SizedBox(width: 10),
                       _StatChip(
                         value: '4.8★',
                         label: lang == 'hi' ? 'App\nRating' : 'App\nRating',
                         color: const Color(0xFFFFB300),
-                        icon: Icons.star_outline,
+                        icon: CupertinoIcons.star_fill,
+                        isDark: isDark,
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 18),
-                  // CTA Button
-                  GestureDetector(
-                    onTap: () => GoRouter.of(context).go('/chat'),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 17),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF2979FF), Color(0xFF7C4DFF)],
-                        ),
-                        borderRadius: BorderRadius.circular(50),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF2979FF).withValues(alpha: 0.5),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.smart_toy_outlined, color: Colors.white, size: 20),
-                          const SizedBox(width: 10),
-                          Text(
-                            lang == 'hi'
-                                ? 'AI se Message Check Karo'
-                                : 'Check Message with AI',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                 ],
               ),
@@ -487,11 +454,13 @@ class _StatChip extends StatelessWidget {
   final String value, label;
   final Color color;
   final IconData icon;
+  final bool isDark;
   const _StatChip({
     required this.value,
     required this.label,
     required this.color,
     required this.icon,
+    required this.isDark,
   });
 
   @override
@@ -500,9 +469,9 @@ class _StatChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
+          color: color.withValues(alpha: isDark ? 0.1 : 0.07),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.2)),
+          border: Border.all(color: color.withValues(alpha: isDark ? 0.2 : 0.15)),
         ),
         child: Column(
           children: [
@@ -522,7 +491,9 @@ class _StatChip extends StatelessWidget {
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.5)
+                    : Colors.black.withValues(alpha: 0.4),
                 fontSize: 9.5,
                 fontWeight: FontWeight.w600,
                 height: 1.3,
@@ -546,25 +517,25 @@ class _ProtectionStatusBar extends StatelessWidget {
     final items = [
       _StatusItem(
         label: lang == 'hi' ? 'SMS Guard' : 'SMS Guard',
-        icon: Icons.mark_chat_read_outlined,
+        icon: CupertinoIcons.chat_bubble_text,
         active: true,
         color: const Color(0xFF4CAF50),
       ),
       _StatusItem(
         label: lang == 'hi' ? 'Call Shield' : 'Call Shield',
-        icon: Icons.call_received_outlined,
+        icon: CupertinoIcons.phone_arrow_down_left,
         active: true,
         color: const Color(0xFF2979FF),
       ),
       _StatusItem(
         label: lang == 'hi' ? 'Email Guard' : 'Email Guard',
-        icon: Icons.email_outlined,
+        icon: CupertinoIcons.mail,
         active: true,
         color: const Color(0xFF7C4DFF),
       ),
       _StatusItem(
         label: lang == 'hi' ? 'WiFi Scan' : 'WiFi Scan',
-        icon: Icons.wifi_protected_setup_outlined,
+        icon: CupertinoIcons.wifi,
         active: false,
         color: const Color(0xFF90A4AE),
       ),
@@ -733,40 +704,40 @@ class _PremiumQuickGrid extends StatelessWidget {
     final tools = [
       _Tool(
         label: lang == 'hi' ? 'OTP\nGuard' : 'OTP\nGuard',
-        icon: Icons.security_rounded,
+        icon: CupertinoIcons.shield_fill,
         color: const Color(0xFF2979FF),
         route: '/otp-guard',
         isHighlighted: true,
       ),
       _Tool(
-        label: lang == 'hi' ? 'URL\nScanner' : 'URL\nScanner',
-        icon: Icons.language_outlined,
+        label: lang == 'hi' ? 'Website\nChecker' : 'Website\nChecker',
+        icon: CupertinoIcons.globe,
         color: const Color(0xFF00897B),
         route: '/url-scanner',
       ),
       _Tool(
         label: lang == 'hi' ? 'App\nAudit' : 'App\nAudit',
-        icon: Icons.security_outlined,
+        icon: CupertinoIcons.search_circle_fill,
         color: const Color(0xFF7C4DFF),
         route: '/app-scanner',
       ),
       _Tool(
         label: lang == 'hi' ? 'WiFi\nCheck' : 'WiFi\nCheck',
-        icon: Icons.wifi_find_outlined,
+        icon: CupertinoIcons.wifi,
         color: const Color(0xFF00ACC1),
         route: '/wifi-scanner',
       ),
       _Tool(
         label: lang == 'hi' ? 'Call\nShield' : 'Call\nShield',
-        icon: Icons.call_outlined,
+        icon: CupertinoIcons.phone_fill,
         color: const Color(0xFFFF6F00),
         route: '/call-shield',
       ),
       _Tool(
-        label: lang == 'hi' ? 'Scam\nAlerts' : 'Scam\nAlerts',
-        icon: Icons.campaign_outlined,
-        color: const Color(0xFFE53935),
-        route: '/feed',
+        label: lang == 'hi' ? 'SMS\nInbox' : 'SMS\nInbox',
+        icon: CupertinoIcons.chat_bubble_2_fill,
+        color: const Color(0xFF4CAF50),
+        route: '/sms-inbox',
       ),
     ];
 
@@ -1070,12 +1041,13 @@ class _EmergencyBanner extends StatelessWidget {
 // ─── Circuit Board Painter ────────────────────────────────────────────────────
 class _CircuitPainter extends CustomPainter {
   final double progress;
-  _CircuitPainter(this.progress);
+  final bool isDark;
+  _CircuitPainter(this.progress, {this.isDark = true});
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF2979FF).withValues(alpha: 0.04)
+      ..color = const Color(0xFF2979FF).withValues(alpha: isDark ? 0.04 : 0.025)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
 
@@ -1095,7 +1067,7 @@ class _CircuitPainter extends CustomPainter {
         end: Alignment.bottomCenter,
         colors: [
           Colors.transparent,
-          const Color(0xFF2979FF).withValues(alpha: 0.08),
+          const Color(0xFF2979FF).withValues(alpha: isDark ? 0.08 : 0.04),
           Colors.transparent,
         ],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
@@ -1125,5 +1097,5 @@ class _CircuitPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_CircuitPainter old) => old.progress != progress;
+  bool shouldRepaint(_CircuitPainter old) => old.progress != progress || old.isDark != isDark;
 }

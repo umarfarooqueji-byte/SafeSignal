@@ -205,7 +205,7 @@ class _WifiScannerScreenState extends State<WifiScannerScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF06090F) : const Color(0xFFF0F4FF);
+    final bg = isDark ? const Color(0xFF06090F) : Colors.white;
 
     return Scaffold(
       backgroundColor: bg,

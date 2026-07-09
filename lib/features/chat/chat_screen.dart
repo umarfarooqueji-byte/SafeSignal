@@ -251,11 +251,11 @@ If text: check sender ID format, URLs, urgency language, threats, money requests
         scamType: 'Suspicious Pattern Detected',
         escalated: false,
         why: isHindi ? [
-          'Is message mein ${scamScore} se zyada suspicious keywords mile hain',
+          'Is message mein $scamScore se zyada suspicious keywords mile hain',
           'Fraudsters aisa language use karte hain — dara ke, laalach de ke ya urgency create karke',
           'Real government agencies aur banks kabhi is tarah message nahi karte',
         ] : [
-          'This message contains ${scamScore}+ suspicious keywords',
+          'This message contains $scamScore+ suspicious keywords',
           'Fraudsters use this language to scare, lure or create urgency',
           'Real government agencies and banks never communicate this way',
         ],

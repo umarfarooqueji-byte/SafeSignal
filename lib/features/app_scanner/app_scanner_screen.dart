@@ -59,7 +59,7 @@ class _AppScannerScreenState extends State<AppScannerScreen>
         analyzed.add(RiskEngine.analyze(raw));
         if (i % 5 == 0) {
           setState(() => _scanned = i + 1);
-          await Future.delayed(const Duration(milliseconds: 8));
+          await Future.delayed(const Duration(milliseconds: 5));
         }
       }
 
@@ -78,15 +78,18 @@ class _AppScannerScreenState extends State<AppScannerScreen>
   void _applyFilters() {
     List<AppInfo> list = _allApps;
 
-    // Tab filter
-    if (_tabIndex == 1) list = list.where((a) => !a.isSystem).toList();
-    if (_tabIndex == 2) list = list.where((a) => a.riskLevel == RiskLevel.high || a.riskLevel == RiskLevel.critical).toList();
-
     // Search
     if (_search.isNotEmpty) {
       list = list.where((a) =>
           a.name.toLowerCase().contains(_search.toLowerCase()) ||
           a.package.toLowerCase().contains(_search.toLowerCase())).toList();
+    }
+
+    // Tab filter
+    if (_tabIndex == 1) {
+      list = list.where((a) => !a.isSystem).toList();
+    } else if (_tabIndex == 2) {
+      list = list.where((a) => a.riskLevel == RiskLevel.high || a.riskLevel == RiskLevel.critical).toList();
     }
 
     setState(() => _displayed = list);
@@ -101,47 +104,47 @@ class _AppScannerScreenState extends State<AppScannerScreen>
 
   Color get _gaugeColor {
     final r = _avgRating;
-    if (r >= 4.0) return const Color(0xFF4CAF50);
-    if (r >= 2.5) return const Color(0xFFFFB300);
-    return const Color(0xFFE53935);
+    if (r >= 4.0) return const Color(0xFF10B981);
+    if (r >= 2.5) return const Color(0xFFF59E0B);
+    return const Color(0xFFEF4444);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF06090F) : const Color(0xFFF0F4FF);
+    const bg = Color(0xFFF8F9FB);
+    const textColor = Color(0xFF1E293B);
 
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new,
-              color: isDark ? Colors.white : const Color(0xFF0D1117), size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new, color: textColor, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          'Apps',
+        title: const Text(
+          'App Audit',
           style: TextStyle(
             fontWeight: FontWeight.w900,
-            fontSize: 24,
-            color: isDark ? Colors.white : const Color(0xFF0D1117),
+            fontSize: 22,
+            color: textColor,
           ),
         ),
         centerTitle: true,
       ),
       body: _phase == _Phase.idle
-          ? _buildIdle(isDark)
+          ? _buildIdle()
           : _phase == _Phase.scanning
-              ? _buildScanning(isDark)
+              ? _buildScanning()
               : _phase == _Phase.error
-                  ? _buildError(isDark)
-                  : _buildResults(isDark),
+                  ? _buildError()
+                  : _buildResults(),
     );
   }
 
-  Widget _buildIdle(bool isDark) {
+  Widget _buildIdle() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -153,47 +156,47 @@ class _AppScannerScreenState extends State<AppScannerScreen>
               height: 110,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF2979FF), Color(0xFF7C4DFF)],
+                  colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF2979FF).withValues(alpha: 0.4),
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.15),
                     blurRadius: 28,
                     offset: const Offset(0, 10),
                   ),
                 ],
               ),
-              child: const Icon(Icons.android, size: 56, color: Colors.white),
+              child: const Icon(Icons.android_rounded, size: 56, color: Colors.white),
             ).animate().scale(begin: const Offset(0.7, 0.7)).fadeIn(),
             const SizedBox(height: 28),
-            Text(
+            const Text(
               'App Security Scanner',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w900,
-                color: isDark ? Colors.white : const Color(0xFF0D1117),
+                color: Color(0xFF1E293B),
               ),
             ).animate().fadeIn(delay: 100.ms),
             const SizedBox(height: 10),
-            Text(
-              'Har installed app ko scan karke batata hai kitni permissions le raha hai aur security rating kya hai (out of 5)',
+            const Text(
+              'Analyze installed apps for hidden permissions, sideloading risks, and SDK vulnerabilities.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
                 height: 1.6,
-                color: isDark ? Colors.white54 : Colors.black54,
+                color: Color(0xFF64748B),
               ),
             ).animate().fadeIn(delay: 160.ms),
             const SizedBox(height: 36),
             ElevatedButton.icon(
               onPressed: _startScan,
               icon: const Icon(Icons.radar, size: 22),
-              label: const Text('Scan Shuru Karo'),
+              label: const Text('Start Full Scan'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2979FF),
+                backgroundColor: const Color(0xFF0F172A),
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(56),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -202,11 +205,12 @@ class _AppScannerScreenState extends State<AppScannerScreen>
               ),
             ).animate().fadeIn(delay: 220.ms),
             const SizedBox(height: 14),
-            Text(
-              '🔒 Sab device pe — koi data bahar nahi jaata',
+            const Text(
+              '🔒 100% on-device analysis',
               style: TextStyle(
                 fontSize: 12,
-                color: isDark ? Colors.white38 : Colors.black38,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF94A3B8),
               ),
             ),
           ],
@@ -215,7 +219,7 @@ class _AppScannerScreenState extends State<AppScannerScreen>
     );
   }
 
-  Widget _buildScanning(bool isDark) {
+  Widget _buildScanning() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -225,9 +229,9 @@ class _AppScannerScreenState extends State<AppScannerScreen>
             height: 180,
             child: ArcGauge(
               value: _scanned.toDouble(),
-              maxValue: 100,
+              maxValue: 200, // Estimate for scaling
               color: const Color(0xFF2979FF),
-              trackColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE0E0E0),
+              trackColor: const Color(0xFFE2E8F0),
               strokeWidth: 16,
               sweepDegrees: 210,
               centerChild: Column(
@@ -243,11 +247,12 @@ class _AppScannerScreenState extends State<AppScannerScreen>
                       height: 1,
                     ),
                   ),
-                  Text(
+                  const Text(
                     'apps',
                     style: TextStyle(
                       fontSize: 14,
-                      color: isDark ? Colors.white38 : Colors.black38,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
                     ),
                   ),
                 ],
@@ -255,25 +260,25 @@ class _AppScannerScreenState extends State<AppScannerScreen>
             ),
           ),
           const SizedBox(height: 20),
-          Text(
-            'Scan Ho Raha Hai...',
+          const Text(
+            'Analyzing Environment...',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
-              color: isDark ? Colors.white : const Color(0xFF0D1117),
+              color: Color(0xFF1E293B),
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Permissions aur security analyze ho rahi hai',
-            style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 14),
+          const Text(
+            'Scanning for sideloaded apps and risky permissions',
+            style: TextStyle(color: Color(0xFF64748B), fontSize: 14, fontWeight: FontWeight.w500),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildError(bool isDark) {
+  Widget _buildError() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -282,25 +287,25 @@ class _AppScannerScreenState extends State<AppScannerScreen>
           children: [
             const Text('⚠️', style: TextStyle(fontSize: 64)),
             const SizedBox(height: 16),
-            Text(
-              'Scan Nahi Ho Saka',
+            const Text(
+              'Scan Failed',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
-                color: isDark ? Colors.white : const Color(0xFF0D1117),
+                color: Color(0xFF1E293B),
               ),
             ),
             const SizedBox(height: 10),
-            Text(
-              'Real Android phone pe install karo — emulator pe app list limited hoti hai.',
+            const Text(
+              'Could not access package manager. Are you running on an emulator without permissions?',
               textAlign: TextAlign.center,
-              style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, height: 1.5),
+              style: TextStyle(color: Color(0xFF64748B), height: 1.5),
             ),
             const SizedBox(height: 28),
             ElevatedButton(
               onPressed: _startScan,
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2979FF)),
-              child: const Text('Dobara Try Karo'),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white),
+              child: const Text('Try Again'),
             ),
           ],
         ),
@@ -308,7 +313,7 @@ class _AppScannerScreenState extends State<AppScannerScreen>
     );
   }
 
-  Widget _buildResults(bool isDark) {
+  Widget _buildResults() {
     final rating = _avgRating;
     final gc = _gaugeColor;
     final critical = _allApps.where((a) => a.riskLevel == RiskLevel.critical).length;
@@ -329,7 +334,7 @@ class _AppScannerScreenState extends State<AppScannerScreen>
                   value: rating,
                   maxValue: 5.0,
                   color: gc,
-                  trackColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE0E0E0),
+                  trackColor: const Color(0xFFE2E8F0),
                   strokeWidth: 20,
                   sweepDegrees: 210,
                   centerChild: Column(
@@ -360,10 +365,10 @@ class _AppScannerScreenState extends State<AppScannerScreen>
                           ],
                         ),
                       ),
-                      Text(
-                        '5',
+                      const Text(
+                        '/ 5',
                         style: TextStyle(
-                          color: isDark ? Colors.white38 : Colors.black38,
+                          color: Color(0xFF94A3B8),
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                         ),
@@ -372,13 +377,25 @@ class _AppScannerScreenState extends State<AppScannerScreen>
                   ),
                 ),
               ),
-              Text(
-                "Apps' Rating",
+              const Text(
+                "Device Security Rating",
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 18,
-                  color: isDark ? Colors.white : const Color(0xFF0D1117),
+                  color: Color(0xFF1E293B),
                 ),
+              ),
+              const SizedBox(height: 8),
+              // Summary stats row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _StatPill(label: '${_allApps.length}', sub: 'Total', color: const Color(0xFF2979FF)),
+                  const SizedBox(width: 8),
+                  _StatPill(label: '$thirdParty', sub: 'Third-Party', color: const Color(0xFF7C4DFF)),
+                  const SizedBox(width: 8),
+                  _StatPill(label: '${critical + high}', sub: 'High Risk', color: const Color(0xFFEF4444)),
+                ],
               ),
             ],
           ),
@@ -386,61 +403,47 @@ class _AppScannerScreenState extends State<AppScannerScreen>
 
         // Tabs
         Container(
-          color: isDark ? const Color(0xFF0D1117) : Colors.white,
+          color: Colors.white,
           child: TabBar(
             controller: _tabController,
             labelColor: const Color(0xFF2979FF),
-            unselectedLabelColor: isDark ? Colors.white38 : Colors.black38,
+            unselectedLabelColor: const Color(0xFF94A3B8),
             indicatorColor: const Color(0xFF2979FF),
             indicatorWeight: 3,
-            labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11),
+            labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
             tabs: [
-              Tab(
-                icon: const Icon(Icons.android, size: 22),
-                text: 'All (${_allApps.length})',
-              ),
-              Tab(
-                icon: const Icon(Icons.download_outlined, size: 22),
-                text: 'Third-Party ($thirdParty)',
-              ),
-              Tab(
-                icon: const Icon(Icons.warning_amber, size: 22),
-                text: 'High Risk (${critical + high})',
-              ),
+              Tab(text: 'All (${_allApps.length})'),
+              Tab(text: '3rd-Party ($thirdParty)'),
+              Tab(text: 'High Risk (${critical + high})'),
             ],
           ),
         ),
 
         // Search bar
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  onChanged: (v) {
-                    _search = v;
-                    _applyFilters();
-                  },
-                  style: TextStyle(
-                      color: isDark ? Colors.white : const Color(0xFF0D1117)),
-                  decoration: InputDecoration(
-                    hintText: 'Search by name or package',
-                    hintStyle: TextStyle(
-                        color: isDark ? Colors.white38 : Colors.black38, fontSize: 13),
-                    prefixIcon: Icon(Icons.search,
-                        color: isDark ? Colors.white38 : Colors.black38),
-                    filled: true,
-                    fillColor: isDark ? const Color(0xFF161B27) : Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: TextField(
+            onChanged: (v) {
+              _search = v;
+              _applyFilters();
+            },
+            style: const TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.w600),
+            decoration: InputDecoration(
+              hintText: 'Search by name or package...',
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+              prefixIcon: const Icon(Icons.search, color: Color(0xFF94A3B8)),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
               ),
-            ],
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+            ),
           ),
         ),
 
@@ -448,18 +451,37 @@ class _AppScannerScreenState extends State<AppScannerScreen>
         Expanded(
           child: _displayed.isEmpty
               ? Center(
-                  child: Text(
-                    'Koi app nahi mili',
-                    style: TextStyle(
-                        color: isDark ? Colors.white38 : Colors.black38, fontSize: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _tabIndex == 2 ? Icons.verified_user_rounded : Icons.search_off_rounded,
+                          size: 52,
+                          color: const Color(0xFFCBD5E1),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _tabIndex == 2
+                              ? 'No high risk apps found! ✅'
+                              : 'No apps found.',
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   itemCount: _displayed.length,
                   itemBuilder: (context, i) => _AppCard(
                     app: _displayed[i],
-                    isDark: isDark,
                     index: i,
                   ),
                 ),
@@ -472,9 +494,8 @@ class _AppScannerScreenState extends State<AppScannerScreen>
 // ─── App Card ─────────────────────────────────────────────────────────────────
 class _AppCard extends StatefulWidget {
   final AppInfo app;
-  final bool isDark;
   final int index;
-  const _AppCard({required this.app, required this.isDark, required this.index});
+  const _AppCard({required this.app, required this.index});
 
   @override
   State<_AppCard> createState() => _AppCardState();
@@ -482,50 +503,74 @@ class _AppCard extends StatefulWidget {
 
 class _AppCardState extends State<_AppCard> {
   bool _expanded = false;
+  Uint8List? _iconBytes;
+  bool _iconLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadIcon();
+  }
+
+  Future<void> _loadIcon() async {
+    try {
+      final bytes = await const MethodChannel('com.safesignal/app_scanner')
+          .invokeMethod<Uint8List>('getAppIcon', {'package': widget.app.package});
+      if (mounted) {
+        setState(() {
+          _iconBytes = bytes;
+          _iconLoaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _iconLoaded = true;
+        });
+      }
+    }
+  }
 
   Color get _ratingColor {
     final r = widget.app.starRating;
-    if (r >= 4.0) return const Color(0xFF4CAF50);
-    if (r >= 2.5) return const Color(0xFFFFB300);
-    return const Color(0xFFE53935);
-  }
-
-  String get _appEmoji {
-    final pkg = widget.app.package.toLowerCase();
-    if (pkg.contains('bank') || pkg.contains('pay') || pkg.contains('upi')) return '🏦';
-    if (pkg.contains('camera') || pkg.contains('photo')) return '📷';
-    if (pkg.contains('message') || pkg.contains('sms') || pkg.contains('chat') || pkg.contains('whatsapp')) return '💬';
-    if (pkg.contains('facebook') || pkg.contains('instagram') || pkg.contains('twitter')) return '📱';
-    if (pkg.contains('game')) return '🎮';
-    if (pkg.contains('music') || pkg.contains('spotify') || pkg.contains('gaana')) return '🎵';
-    if (pkg.contains('map') || pkg.contains('location') || pkg.contains('navigation')) return '🗺️';
-    if (pkg.contains('mail') || pkg.contains('gmail')) return '📧';
-    if (pkg.contains('shop') || pkg.contains('amazon') || pkg.contains('flipkart') || pkg.contains('myntra')) return '🛒';
-    if (pkg.contains('video') || pkg.contains('youtube') || pkg.contains('netflix')) return '🎬';
-    if (pkg.contains('airtel') || pkg.contains('jio') || pkg.contains('vi.')) return '📡';
-    if (widget.app.isSystem) return '⚙️';
-    return '📦';
+    if (r >= 4.0) return const Color(0xFF10B981); // Emerald
+    if (r >= 2.5) return const Color(0xFFF59E0B); // Amber
+    return const Color(0xFFEF4444); // Red
   }
 
   @override
   Widget build(BuildContext context) {
     final app = widget.app;
     final rc = _ratingColor;
-    final source = app.isSystem ? 'This is a System App' : 'Downloaded from Play Store';
+    
+    // Determine install source nicely
+    String source;
+    if (app.isSystem) {
+      source = 'System App';
+    } else if (app.installer == 'com.android.vending') {
+      source = 'Play Store';
+    } else {
+      source = 'Sideloaded (${app.installer})';
+    }
 
     return GestureDetector(
       onTap: () => setState(() => _expanded = !_expanded),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: widget.isDark ? const Color(0xFF161B27) : Colors.white,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: _expanded
-                ? rc.withValues(alpha: 0.4)
-                : (widget.isDark ? const Color(0xFF30363D) : const Color(0xFFE8EEF8)),
+            color: _expanded ? rc.withValues(alpha: 0.4) : const Color(0xFFE2E8F0),
             width: _expanded ? 1.5 : 1,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           children: [
@@ -538,12 +583,13 @@ class _AppCardState extends State<_AppCard> {
                     width: 52,
                     height: 52,
                     decoration: BoxDecoration(
-                      color: rc.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(14),
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Center(
-                      child: Text(_appEmoji, style: const TextStyle(fontSize: 26)),
-                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: _iconLoaded && _iconBytes != null
+                        ? Image.memory(_iconBytes!, fit: BoxFit.cover)
+                        : const Center(child: Icon(Icons.android, color: Color(0xFF94A3B8))),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -552,29 +598,29 @@ class _AppCardState extends State<_AppCard> {
                       children: [
                         Text(
                           app.name,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 15,
-                            color: widget.isDark ? Colors.white : const Color(0xFF0D1117),
+                            color: Color(0xFF1E293B),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
                         Text(
                           app.package,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 11,
-                            color: widget.isDark ? Colors.white38 : Colors.black38,
+                            color: Color(0xFF64748B),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          source,
+                          'Source: $source',
                           style: TextStyle(
                             fontSize: 11,
-                            color: widget.isDark ? Colors.white54 : Colors.black54,
-                            fontStyle: FontStyle.italic,
+                            color: source.startsWith('Sideloaded') ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -584,28 +630,28 @@ class _AppCardState extends State<_AppCard> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
-                        'Security Rating',
+                      const Text(
+                        'Risk Score',
                         style: TextStyle(
                           fontSize: 9,
-                          color: widget.isDark ? Colors.white38 : Colors.black38,
-                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF94A3B8),
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        app.starRating.toStringAsFixed(1),
+                        '${app.riskScore}/100',
                         style: TextStyle(
-                          fontSize: 22,
+                          fontSize: 18,
                           fontWeight: FontWeight.w900,
                           color: rc,
                           height: 1.1,
                         ),
                       ),
                       Text(
-                        app.riskLabel.split(' ').last, // just emoji + word
+                        app.riskLabel.split(' ').last, // just emoji
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: rc,
                         ),
@@ -658,7 +704,7 @@ class _AppCardState extends State<_AppCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Risky Permissions (${app.riskReasons.length})',
+                      'Security Issues (${app.riskReasons.length})',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 13,
@@ -667,13 +713,13 @@ class _AppCardState extends State<_AppCard> {
                     ),
                     const SizedBox(height: 8),
                     if (app.riskReasons.isEmpty)
-                      Row(
+                      const Row(
                         children: [
-                          Icon(Icons.check_circle, color: const Color(0xFF4CAF50), size: 16),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'Koi suspicious permission nahi ✅',
-                            style: TextStyle(color: Color(0xFF4CAF50), fontWeight: FontWeight.w600),
+                          Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 16),
+                          SizedBox(width: 6),
+                          Text(
+                            'No major security issues found ✅',
+                            style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w600),
                           ),
                         ],
                       )
@@ -683,28 +729,43 @@ class _AppCardState extends State<_AppCard> {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.warning_amber, color: rc, size: 14),
+                                Icon(Icons.warning_amber_rounded, color: rc, size: 16),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
                                     r,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 12,
                                       height: 1.4,
-                                      color: widget.isDark ? Colors.white70 : Colors.black87,
+                                      color: Color(0xFF334155),
+                                      fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                 ),
                               ],
                             ),
                           )),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Total permissions: ${app.permissions.length}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: widget.isDark ? Colors.white38 : Colors.black38,
-                      ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Text(
+                          'Target SDK: ${app.targetSdk}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Total perms: ${app.permissions.length}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -720,83 +781,49 @@ class _AppCardState extends State<_AppCard> {
 enum RiskLevel { safe, low, medium, high, critical }
 
 class AppInfo {
-  final String name, package, version;
+  final String name, package, version, installer;
+  final int targetSdk;
   final List<String> permissions;
   final bool isSystem;
-  final int riskScore;
+  final int riskScore; // 0-100 (100 = bad)
   final RiskLevel riskLevel;
   final List<String> riskReasons;
 
   const AppInfo({
     required this.name, required this.package, required this.version,
+    required this.installer, required this.targetSdk,
     required this.permissions, required this.isSystem,
     required this.riskScore, required this.riskLevel, required this.riskReasons,
   });
 
-  /// Maps 0-100 risk score to 1.0-5.0 stars (never 0)
-  /// riskScore=0 → 5.0★ (completely safe)
-  /// riskScore=25 → 4.0★ (low risk)
-  /// riskScore=50 → 3.0★ (moderate)
-  /// riskScore=75 → 2.0★ (high risk)
-  /// riskScore=100 → 1.0★ (critical — but still shows 1, not 0)
+  /// Maps 0-100 risk score to 1.0-5.0 stars for the top gauge
   double get starRating => (5.0 - (riskScore * 4.0 / 100.0)).clamp(1.0, 5.0);
 
   String get riskLabel {
     final r = starRating;
-    if (r >= 4.5) return 'Bilkul Safe ✅';
-    if (r >= 3.5) return 'Kam Risk 🟡';
-    if (r >= 2.5) return 'Moderate Risk 🟠';
+    if (r >= 4.5) return 'Safe ✅';
+    if (r >= 3.5) return 'Low Risk 🟡';
+    if (r >= 2.5) return 'Moderate 🟠';
     if (r >= 1.5) return 'High Risk 🔴';
-    return 'Critical Risk ⛔';
+    return 'Critical ⛔';
   }
 }
 
 class RiskEngine {
-  // ── Calibrated permission weights (lower = more realistic spread) ──────────
-  // These are carefully tuned so that:
-  // - System apps (no risky perms) → 5.0★
-  // - WhatsApp/Instagram (many legitimate perms) → ~2.5-3.5★
-  // - Unknown app with SMS+location+accessibility → ~1.0-1.5★
   static const _dangerPerms = {
-    'android.permission.RECORD_AUDIO':              ('🎤 Microphone',        12, 'App background mein awaaz record kar sakta hai'),
-    'android.permission.CAMERA':                    ('📷 Camera',             8, 'App bina bataye photo le sakta hai'),
-    'android.permission.READ_CONTACTS':             ('👥 Contacts',          10, 'App aapki puri contact list padh sakta hai'),
-    'android.permission.READ_SMS':                  ('💬 SMS Read',          18, 'App aapke SMS padh sakta hai — OTP bhi!'),
-    'android.permission.SEND_SMS':                  ('📤 SMS Send',          15, 'App aapki taraf se SMS bhej sakta hai'),
-    'android.permission.RECEIVE_SMS':               ('📩 SMS Receive',        12, 'App incoming SMS intercept kar sakta hai'),
-    'android.permission.ACCESS_FINE_LOCATION':      ('📍 Exact Location',    12, 'App aapki exact GPS location track karta hai'),
-    'android.permission.ACCESS_BACKGROUND_LOCATION':('📍 24/7 Location',     22, '⚠️ Background mein bhi location track — bahut risky'),
-    'android.permission.READ_CALL_LOG':             ('📞 Call History',      15, 'App aapki call history dekh sakta hai'),
-    'android.permission.PROCESS_OUTGOING_CALLS':    ('📞 Call Intercept',    18, 'App aapke calls ko intercept kar sakta hai'),
-    'android.permission.GET_ACCOUNTS':              ('🔑 Device Accounts',    8, 'App phone mein saved accounts dekh sakta hai'),
-    'android.permission.SYSTEM_ALERT_WINDOW':       ('🪟 Screen Overlay',    14, 'App doosri apps ke upar dikhne ki permission hai'),
-    'android.permission.BIND_ACCESSIBILITY_SERVICE':('♿ Accessibility',      28, '🚨 BAHUT RISKY — screen pe sab kuch dekh sakta hai'),
-    'android.permission.REQUEST_INSTALL_PACKAGES':  ('📦 App Install',       18, 'App kisi bhi apk ko install kar sakta hai'),
-    'android.permission.READ_PHONE_STATE':          ('📱 Phone ID/IMEI',      8, 'App aapka phone number aur IMEI padh sakta hai'),
-    'android.permission.WRITE_SETTINGS':            ('⚙️ System Settings',   12, 'App phone ki system settings change kar sakta hai'),
-    'android.permission.WRITE_EXTERNAL_STORAGE':    ('💾 Storage Write',      8, 'App aapki files likh sakta hai'),
-    'android.permission.READ_EXTERNAL_STORAGE':     ('📂 Storage Read',       6, 'App aapki files padh sakta hai'),
-  };
-
-  // Well-known legitimate apps — give 40% score reduction
-  // These apps have many permissions by design (messaging, social, banking)
-  static const _knownLegitimate = {
-    'com.whatsapp', 'com.whatsapp.w4b',
-    'com.facebook.katana', 'com.instagram.android', 'com.facebook.lite',
-    'com.google.android.gm', 'com.google.android.apps.messaging',
-    'com.android.chrome', 'com.google.android.googlequicksearchbox',
-    'com.spotify.music', 'com.gaana', 'com.jiosaavn',
-    'com.phonepe.app', 'net.one97.paytm', 'com.google.android.apps.tachyon',
-    'in.amazon.mShop.android.shopping', 'com.flipkart.android',
-    'com.myntra.android', 'com.swiggy.android', 'app.zomato',
-    'com.netflix.mediaclient', 'com.google.android.youtube',
-    'com.snapchat.android', 'com.twitter.android', 'com.linkedin.android',
-    'com.telegram.messenger', 'org.telegram.messenger',
-    'com.microsoft.teams', 'com.zoom.videomeetings', 'us.zoom.videomeetings',
-    'com.airtel.mcare', 'com.jio.myjio', 'com.vi.app',
-    'com.truecaller',
-    'com.google.android.apps.photos', 'com.google.android.maps',
-    'com.amazon.mShop.android', 'com.google.android.keep',
+    'android.permission.RECORD_AUDIO':              ('Microphone',        8, 'Can record audio in background.'),
+    'android.permission.CAMERA':                    ('Camera',            8, 'Can access camera invisibly.'),
+    'android.permission.READ_CONTACTS':             ('Contacts',          10, 'Can read all your contacts.'),
+    'android.permission.READ_SMS':                  ('Read SMS',          20, 'Can read OTPs and private messages.'),
+    'android.permission.SEND_SMS':                  ('Send SMS',          15, 'Can send premium SMS messages.'),
+    'android.permission.RECEIVE_SMS':               ('Receive SMS',       15, 'Can intercept incoming OTPs.'),
+    'android.permission.ACCESS_FINE_LOCATION':      ('Precise Location',  8, 'Can track exact GPS location.'),
+    'android.permission.ACCESS_BACKGROUND_LOCATION':('24/7 Location',     15, 'Can track location even when closed.'),
+    'android.permission.READ_CALL_LOG':             ('Call History',      12, 'Can see who you called.'),
+    'android.permission.PROCESS_OUTGOING_CALLS':    ('Intercept Calls',   18, 'Can monitor or block outgoing calls.'),
+    'android.permission.SYSTEM_ALERT_WINDOW':       ('Screen Overlay',    25, 'Can draw over other apps (often used to steal passwords).'),
+    'android.permission.BIND_ACCESSIBILITY_SERVICE':('Accessibility',     35, 'Full control of device. Very dangerous if misused.'),
+    'android.permission.REQUEST_INSTALL_PACKAGES':  ('Install Apps',      20, 'Can install other potentially malicious apps.'),
   };
 
   static AppInfo analyze(Map<String, dynamic> raw) {
@@ -805,56 +832,121 @@ class RiskEngine {
     final pkg = raw['package'] as String? ?? '';
     final isSystem = raw['isSystem'] as bool? ?? false;
     final version = raw['versionName'] as String? ?? '';
-
-    final pkgLower = pkg.toLowerCase();
-    final isKnownLegit = _knownLegitimate.contains(pkg) || isSystem;
+    final installer = raw['installer'] as String? ?? 'unknown';
+    final targetSdk = raw['targetSdk'] as int? ?? 33; // Default modern if missing
 
     int score = 0;
     final reasons = <String>[];
 
-    for (final perm in perms) {
-      final info = _dangerPerms[perm];
-      if (info != null) {
-        // Known legitimate apps get 40% weight reduction per permission
-        final weight = isKnownLegit ? (info.$2 * 0.6).round() : info.$2;
-        score += weight;
-        reasons.add('${info.$1}: ${info.$3}');
+    // Real Sideloading Check
+    bool isSideloaded = !isSystem && installer != 'com.android.vending' && installer != 'com.amazon.venezia';
+
+    if (isSystem) {
+      // System apps are generally trusted.
+      score = 0;
+    } else {
+      if (isSideloaded) {
+        score += 20;
+        reasons.add('Sideloaded App: Not verified by Play Protect. Installed via $installer.');
+      }
+
+      if (targetSdk < 28) { // Android 9 (Pie)
+        score += 15;
+        reasons.add('Outdated SDK (Target: $targetSdk): Bypasses modern Android security protections.');
+      }
+
+      for (final perm in perms) {
+        final info = _dangerPerms[perm];
+        if (info != null) {
+          // If it's sideloaded OR targets old SDK, dangerous permissions carry full weight.
+          // If it's a Play Store app targeting modern SDK, we assume Google vetted it heavily, so reduce the weight drastically.
+          int weight = info.$2;
+          if (!isSideloaded && targetSdk >= 30) {
+            weight = (weight * 0.3).round(); // 70% reduction in risk score for modern Play Store apps
+          }
+          
+          if (weight > 0) {
+             score += weight;
+             // Only add to reasons if it contributed significantly, or if it's highly sensitive
+             if (info.$2 >= 15 || isSideloaded) {
+               reasons.add('${info.$1}: ${info.$3}');
+             }
+          }
+        }
+      }
+
+      // Flag dangerous combinations
+      if (perms.contains('android.permission.RECEIVE_SMS') && perms.contains('android.permission.SYSTEM_ALERT_WINDOW')) {
+        score += 30;
+        reasons.insert(0, 'CRITICAL: Requests SMS + Screen Overlay (Classic Banking Trojan Pattern).');
       }
     }
 
-    // Penalty for excessive permission count in unknown apps
-    if (perms.length > 30 && !isKnownLegit) {
-      score += 12;
-      reasons.add('📋 ${perms.length} permissions — zyada uthane ki wajah bataiye');
-    }
+    score = score.clamp(0, 100);
 
-    // Suspicious package name keywords
-    if (['spyware', 'tracker', 'hack', 'spy', 'stealth', 'keylog']
-        .any((p) => pkgLower.contains(p))) {
-      score += 40;
-      reasons.insert(0, '⚠️ Package naam suspicious lag raha hai');
-    }
-
-    // Score cap: max 80 for legit apps (so they always get ≥1.8★)
-    // max 95 for unknown suspicious apps (so they get ≥1.2★)
-    score = isKnownLegit ? score.clamp(0, 80) : score.clamp(0, 95);
-
-    final level = score >= 68
+    final level = score >= 80
         ? RiskLevel.critical
         : score >= 50
             ? RiskLevel.high
-            : score >= 32
+            : score >= 25
                 ? RiskLevel.medium
-                : score >= 15
+                : score >= 10
                     ? RiskLevel.low
                     : RiskLevel.safe;
 
     return AppInfo(
-      name: name, package: pkg, version: version, permissions: perms,
-      isSystem: isSystem, riskScore: score, riskLevel: level,
-      riskReasons: reasons.take(6).toList(),
+      name: name, package: pkg, version: version, 
+      installer: installer, targetSdk: targetSdk,
+      permissions: perms, isSystem: isSystem, 
+      riskScore: score, riskLevel: level,
+      riskReasons: reasons,
     );
   }
 }
 
 enum _Phase { idle, scanning, done, error }
+
+// ─── Stat Pill ────────────────────────────────────────────────────────────────
+class _StatPill extends StatelessWidget {
+  final String label, sub;
+  final Color color;
+  const _StatPill({
+    required this.label,
+    required this.sub,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            sub,
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

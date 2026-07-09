@@ -79,7 +79,7 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF06090F) : const Color(0xFFF0F4FF);
+    final bg = isDark ? const Color(0xFF06090F) : Colors.white;
     final textThemeColor = isDark ? Colors.white : const Color(0xFF0D1117);
 
     return Scaffold(

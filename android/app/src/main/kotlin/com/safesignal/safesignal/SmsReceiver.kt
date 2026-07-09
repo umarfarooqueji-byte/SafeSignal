@@ -6,9 +6,13 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Build
 import android.provider.Telephony
 import androidx.core.app.NotificationCompat
+import org.json.JSONArray
+import org.json.JSONObject
+import java.time.Instant
 import java.util.Locale
 import java.util.regex.Pattern
 
@@ -16,6 +20,9 @@ class SmsReceiver : BroadcastReceiver() {
     companion object {
         private const val CHANNEL_ID = "safesignal_sms_alerts"
         private const val NOTIFICATION_ID_BASE = 2002
+        private const val PREFS_NAME = "FlutterSharedPreferences"
+        private const val PREFS_KEY = "flutter.sms_inbox"
+        private const val MAX_STORED = 200
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -27,6 +34,11 @@ class SmsReceiver : BroadcastReceiver() {
                 val body = msg.messageBody ?: continue
                 val sender = msg.originatingAddress ?: "Unknown"
                 val analysis = analyzeSms(body, sender)
+                
+                // ── Save to SharedPreferences for Flutter to read ──────────
+                saveSmsToInbox(context, sender, body, analysis)
+                
+                // ── Show notification ──────────────────────────────────────
                 if (analysis.isSuspicious) {
                     showScamNotification(context, sender, body, analysis)
                 } else {
@@ -35,6 +47,37 @@ class SmsReceiver : BroadcastReceiver() {
             }
         } catch (e: Exception) {
             // fail silently
+        }
+    }
+
+    // ─── Save SMS to Flutter SharedPreferences ────────────────────────────────
+    private fun saveSmsToInbox(
+        context: Context, sender: String, body: String, analysis: SmsAnalysis
+    ) {
+        try {
+            val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val existing = prefs.getString(PREFS_KEY, "[]")
+            val arr = JSONArray(existing)
+
+            val record = JSONObject().apply {
+                put("sender", sender)
+                put("body", body)
+                put("verdict", analysis.verdict)
+                put("confidence", analysis.confidence)
+                put("reason", analysis.reason)
+                put("receivedAt", Instant.now().toString())
+            }
+
+            // Insert at beginning (newest first)
+            val newArr = JSONArray()
+            newArr.put(record)
+            for (i in 0 until minOf(arr.length(), MAX_STORED - 1)) {
+                newArr.put(arr.get(i))
+            }
+
+            prefs.edit().putString(PREFS_KEY, newArr.toString()).apply()
+        } catch (e: Exception) {
+            // fail silently — never crash on SMS storage failure
         }
     }
 
@@ -87,10 +130,10 @@ class SmsReceiver : BroadcastReceiver() {
     // ─── Analysis Result ─────────────────────────────────────────────────────
     private data class SmsAnalysis(
         val isSuspicious: Boolean,
-        val verdict: String,        // "SCAM" | "PHISHING" | "CAUTION"
+        val verdict: String,        // "SCAM" | "CAUTION" | "SAFE"
         val confidence: Int,        // 0-100
         val reason: String,
-        val category: String        // human-readable category in Hinglish
+        val category: String        // human-readable category
     )
 
     // ─── Core Analysis Engine ─────────────────────────────────────────────────
@@ -139,7 +182,7 @@ class SmsReceiver : BroadcastReceiver() {
             }
         }
 
-        // ── TIER 2: Medium-confidence scam indicators (each +20 score) ───────
+        // ── TIER 2: Medium-confidence indicators (each +20 score) ─────────
         val tier2 = listOf(
             "click here", "tap here", "click link", "click now",
             "verify account", "verify your", "update account",
@@ -153,11 +196,11 @@ class SmsReceiver : BroadcastReceiver() {
             if (lower.contains(kw)) {
                 score += 20
                 detectedReasons.add("Urgency/pressure tactic: '$kw'")
-                break // count only once for tier2
+                break
             }
         }
 
-        // ── TIER 3: Suspicious links + urgency combo (each +30 score) ────────
+        // ── TIER 3: Suspicious links + urgency combo (+30 score) ──────────
         val hasLink = lower.contains("http") || lower.contains("www.")
             || lower.contains(".apk") || lower.contains("bit.ly")
             || lower.contains("tinyurl") || lower.contains(".ru/")
@@ -173,18 +216,14 @@ class SmsReceiver : BroadcastReceiver() {
             detectedReasons.add("APK download link — highly dangerous!")
         }
 
-        // ── TIER 4: Sender number analysis ───────────────────────────────────
+        // ── TIER 4: Sender number analysis ───────────────────────────────
         val cleanSender = sender.replace(Regex("[\\s\\-()]+"), "")
         if (cleanSender.startsWith("+") && !cleanSender.startsWith("+91")) {
             score += 15
             detectedReasons.add("International number sender")
         }
-        // If sender is a 10-digit number (not short code), slight risk
-        if (cleanSender.matches(Regex("\\d{10}"))) {
-            // Normal mobile number — no change
-        }
 
-        // ── SAFE INDICATORS (reduce score) ───────────────────────────────────
+        // ── SAFE INDICATORS (reduce score) ───────────────────────────────
         val safeIndicators = listOf(
             "your transaction of", "credited to your", "debited from your",
             "upi ref no", "upi ref", "neft transfer", "imps transfer",
@@ -193,14 +232,15 @@ class SmsReceiver : BroadcastReceiver() {
         )
         val isSafeContext = safeIndicators.any { lower.contains(it) }
         if (isSafeContext) {
-            score = (score * 0.4).toInt() // Heavily reduce score for legitimate banking messages
+            score = (score * 0.4).toInt()
         }
 
-        // ── Verdict ───────────────────────────────────────────────────────────
+        // ── Verdict ───────────────────────────────────────────────────────
+        val reasonText = detectedReasons.take(2).joinToString("; ")
         return when {
             score >= 60 -> SmsAnalysis(
                 true, "SCAM", score.coerceAtMost(99),
-                detectedReasons.take(2).joinToString("; "),
+                if (reasonText.isNotEmpty()) reasonText else "Multiple scam indicators detected",
                 "Scam SMS Detected"
             )
             score in 35..59 -> SmsAnalysis(
@@ -208,7 +248,11 @@ class SmsReceiver : BroadcastReceiver() {
                 detectedReasons.firstOrNull() ?: "Suspicious content found",
                 "Suspicious SMS"
             )
-            else -> SmsAnalysis(false, "SAFE", score, "", "")
+            else -> SmsAnalysis(
+                false, "SAFE", maxOf(5, 100 - score),
+                if (isSafeContext) "Legitimate banking/service message detected" else "No scam patterns found",
+                "Safe Message"
+            )
         }
     }
 

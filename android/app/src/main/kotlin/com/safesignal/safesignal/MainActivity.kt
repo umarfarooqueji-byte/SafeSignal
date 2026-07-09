@@ -9,6 +9,8 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.provider.Settings
 import android.telephony.TelephonyManager
+import android.os.Bundle
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -16,12 +18,25 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.safesignal/app_scanner"
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
+        super.onCreate(savedInstanceState)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "getInstalledApps" -> result.success(getInstalledApps())
+                    "getAppIcon" -> {
+                        val pkg = call.argument<String>("package")
+                        if (pkg != null) {
+                            result.success(getAppIcon(pkg))
+                        } else {
+                            result.error("INVALID_ARGUMENT", "Package name is required", null)
+                        }
+                    }
                     "getWifiSecurityType" -> result.success(getWifiSecurityType())
                     "openWifiSettings" -> {
                         openWifiSettings()
@@ -74,6 +89,17 @@ class MainActivity : FlutterActivity() {
             val permissions = pkg.requestedPermissions?.toList() ?: emptyList()
             val appName = pm.getApplicationLabel(appInfo).toString()
 
+            val installer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                try {
+                    pm.getInstallSourceInfo(pkg.packageName).installingPackageName
+                } catch (e: Exception) {
+                    pm.getInstallerPackageName(pkg.packageName)
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getInstallerPackageName(pkg.packageName)
+            }
+
             apps.add(
                 mapOf(
                     "name" to appName,
@@ -81,10 +107,37 @@ class MainActivity : FlutterActivity() {
                     "permissions" to permissions,
                     "isSystem" to isSystem,
                     "versionName" to (pkg.versionName ?: ""),
+                    "installer" to (installer ?: "unknown"),
+                    "targetSdk" to appInfo.targetSdkVersion
                 )
             )
         }
         return apps
+    }
+
+    private fun getAppIcon(packageName: String): ByteArray? {
+        return try {
+            val pm = packageManager
+            val icon = pm.getApplicationIcon(packageName)
+            val bitmap = if (icon is android.graphics.drawable.BitmapDrawable) {
+                icon.bitmap
+            } else {
+                val bmp = android.graphics.Bitmap.createBitmap(
+                    icon.intrinsicWidth.takeIf { it > 0 } ?: 1,
+                    icon.intrinsicHeight.takeIf { it > 0 } ?: 1,
+                    android.graphics.Bitmap.Config.ARGB_8888
+                )
+                val canvas = android.graphics.Canvas(bmp)
+                icon.setBounds(0, 0, canvas.width, canvas.height)
+                icon.draw(canvas)
+                bmp
+            }
+            val stream = java.io.ByteArrayOutputStream()
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
+            stream.toByteArray()
+        } catch (e: Exception) {
+            null
+        }
     }
 
     // ─── WiFi Security Type ──────────────────────────────────────────────────
