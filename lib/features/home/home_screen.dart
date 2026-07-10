@@ -520,24 +520,28 @@ class _ProtectionStatusBar extends StatelessWidget {
         icon: CupertinoIcons.chat_bubble_text,
         active: true,
         color: const Color(0xFF4CAF50),
+        route: '/sms-inbox',
       ),
       _StatusItem(
         label: lang == 'hi' ? 'Call Shield' : 'Call Shield',
         icon: CupertinoIcons.phone_arrow_down_left,
         active: true,
         color: const Color(0xFF2979FF),
+        route: '/call-shield',
       ),
       _StatusItem(
         label: lang == 'hi' ? 'Email Guard' : 'Email Guard',
         icon: CupertinoIcons.mail,
         active: true,
         color: const Color(0xFF7C4DFF),
+        route: '/email-breach',
       ),
       _StatusItem(
         label: lang == 'hi' ? 'WiFi Scan' : 'WiFi Scan',
         icon: CupertinoIcons.wifi,
         active: false,
         color: const Color(0xFF90A4AE),
+        route: '/wifi-scanner',
       ),
     ];
 
@@ -549,9 +553,15 @@ class _ProtectionStatusBar extends StatelessWidget {
         itemCount: items.length,
         itemBuilder: (context, i) {
           final item = items[i];
-          return Container(
-            width: 132,
-            margin: const EdgeInsets.only(right: 10),
+          return GestureDetector(
+            onTap: () {
+              if (item.route != null) {
+                GoRouter.of(context).go(item.route!);
+              }
+            },
+            child: Container(
+              width: 132,
+              margin: const EdgeInsets.only(right: 10),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF0F1724) : Colors.white,
@@ -632,7 +642,8 @@ class _ProtectionStatusBar extends StatelessWidget {
                 ),
               ],
             ),
-          ).animate().fadeIn(delay: Duration(milliseconds: i * 60)).slideX(begin: 0.08);
+          ),
+        ).animate().fadeIn(delay: Duration(milliseconds: i * 60)).slideX(begin: 0.08);
         },
       ),
     );
@@ -644,11 +655,13 @@ class _StatusItem {
   final IconData icon;
   final bool active;
   final Color color;
+  final String? route;
   const _StatusItem({
     required this.label,
     required this.icon,
     required this.active,
     required this.color,
+    this.route,
   });
 }
 
@@ -703,10 +716,10 @@ class _PremiumQuickGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final tools = [
       _Tool(
-        label: lang == 'hi' ? 'OTP\nGuard' : 'OTP\nGuard',
-        icon: CupertinoIcons.shield_fill,
-        color: const Color(0xFF2979FF),
-        route: '/otp-guard',
+        label: lang == 'hi' ? 'Device\nAudit' : 'Device\nAudit',
+        icon: CupertinoIcons.device_phone_portrait,
+        color: const Color(0xFFF44336), // Red color for system audit
+        route: '/device-audit',
         isHighlighted: true,
       ),
       _Tool(
@@ -716,16 +729,23 @@ class _PremiumQuickGrid extends StatelessWidget {
         route: '/url-scanner',
       ),
       _Tool(
+        label: lang == 'hi' ? 'Dark Web\nScan' : 'Dark Web\nScan',
+        icon: CupertinoIcons.mail_solid,
+        color: const Color(0xFFE91E63),
+        route: '/email-breach',
+      ),
+      _Tool(
         label: lang == 'hi' ? 'App\nAudit' : 'App\nAudit',
         icon: CupertinoIcons.search_circle_fill,
         color: const Color(0xFF7C4DFF),
         route: '/app-scanner',
       ),
       _Tool(
-        label: lang == 'hi' ? 'WiFi\nCheck' : 'WiFi\nCheck',
-        icon: CupertinoIcons.wifi,
+        label: lang == 'hi' ? 'UPI & QR\nScanner' : 'UPI & QR\nScanner',
+        icon: CupertinoIcons.qrcode_viewfinder,
         color: const Color(0xFF00ACC1),
-        route: '/wifi-scanner',
+        route: '/upi-scanner',
+        isHighlighted: false,
       ),
       _Tool(
         label: lang == 'hi' ? 'Call\nShield' : 'Call\nShield',

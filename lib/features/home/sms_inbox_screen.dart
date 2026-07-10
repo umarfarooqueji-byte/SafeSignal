@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import '../../core/services/crowd_intel_service.dart';
 
 class SmsInboxScreen extends StatefulWidget {
   const SmsInboxScreen({super.key});
@@ -427,11 +428,11 @@ class _SmsCardState extends State<_SmsCard> {
               ),
             ),
 
-            // Expanded reason
-            if (_expanded && sms.reason.isNotEmpty)
+      // Expanded: Risk score + Reason card + Report button
+            if (_expanded) ...[  
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
                 decoration: BoxDecoration(
                   color: vc.withValues(alpha: 0.05),
                   borderRadius:
@@ -440,30 +441,129 @@ class _SmsCardState extends State<_SmsCard> {
                     top: BorderSide(color: vc.withValues(alpha: 0.15)),
                   ),
                 ),
-                child: Row(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      sms.verdict == 'SAFE'
-                          ? Icons.check_circle_outline
-                          : Icons.warning_amber_outlined,
-                      color: vc,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        sms.reason,
-                        style: TextStyle(
-                          fontSize: 13,
-                          height: 1.5,
-                          color: widget.isDark ? Colors.white70 : Colors.black87,
+                    // Risk Score bar
+                    Row(
+                      children: [
+                        Text(
+                          'Risk Score',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: vc,
+                            letterSpacing: 0.5,
+                          ),
                         ),
+                        const Spacer(),
+                        Text(
+                          '${sms.confidence}/100',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: vc,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: sms.confidence / 100,
+                        backgroundColor: vc.withValues(alpha: 0.15),
+                        color: vc,
+                        minHeight: 5,
                       ),
                     ),
+
+                    // Reason card
+                    if (sms.reason.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        'Why this verdict?',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: widget.isDark ? Colors.white54 : Colors.black45,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Split reasons by newline or semicolon
+                      ...sms.reason.split(RegExp(r'[;\n]+')).where((r) => r.trim().isNotEmpty).map(
+                        (r) => Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('🔴 ', style: const TextStyle(fontSize: 12)),
+                              Expanded(
+                                child: Text(
+                                  r.trim(),
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    height: 1.45,
+                                    color: widget.isDark ? Colors.white70 : Colors.black87,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    // Report as Scam button
+                    if (sms.verdict == 'SCAM' || sms.verdict == 'CAUTION') ...[
+                      const SizedBox(height: 12),
+                      GestureDetector(
+                        onTap: () async {
+                          await CrowdIntelService().reportThreat(
+                            rawValue: '${sms.sender}::${sms.body.substring(0, sms.body.length.clamp(0, 50))}',
+                            type: 'sms',
+                            verdict: 'SCAM',
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('✅ Reported! This will protect other SafeSignal users.'),
+                                backgroundColor: Color(0xFF4CAF50),
+                              ),
+                            );
+                          }
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE53935).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFE53935).withValues(alpha: 0.3)),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.flag_outlined, color: Color(0xFFE53935), size: 15),
+                              SizedBox(width: 6),
+                              Text(
+                                'Report as Scam',
+                                style: TextStyle(
+                                  color: Color(0xFFE53935),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
+            ],
           ],
         ),
       ).animate().fadeIn(delay: Duration(milliseconds: widget.index * 40)),

@@ -57,3 +57,5 @@ GoogleService-Info.plist
 
 # Flutter plugins
 .flutter-plugins
+
+.env

@@ -876,9 +876,31 @@ class RiskEngine {
       }
 
       // Flag dangerous combinations
+      final hasInternet = perms.contains('android.permission.INTERNET');
+      
       if (perms.contains('android.permission.RECEIVE_SMS') && perms.contains('android.permission.SYSTEM_ALERT_WINDOW')) {
         score += 30;
         reasons.insert(0, 'CRITICAL: Requests SMS + Screen Overlay (Classic Banking Trojan Pattern).');
+      }
+      
+      if (hasInternet && perms.contains('android.permission.BIND_ACCESSIBILITY_SERVICE')) {
+        score += 40;
+        reasons.insert(0, 'CRITICAL: Accessibility + Internet (High Risk of Screen Scraping / Data Theft).');
+      }
+
+      if (hasInternet && perms.contains('android.permission.RECORD_AUDIO') && !isSystem) {
+        score += 15;
+        reasons.add('Spyware Risk: Mic + Internet (Can record and upload audio).');
+      }
+
+      if (hasInternet && perms.contains('android.permission.CAMERA') && !isSystem) {
+        score += 15;
+        reasons.add('Spyware Risk: Camera + Internet (Can take and upload hidden pictures).');
+      }
+      
+      if (hasInternet && perms.contains('android.permission.READ_CONTACTS') && !isSystem) {
+        score += 15;
+        reasons.add('Data Exfiltration Risk: Contacts + Internet (Can upload your entire address book).');
       }
     }
 

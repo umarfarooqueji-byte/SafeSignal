@@ -9,7 +9,6 @@ import '../../features/home/home_screen.dart';
 import '../../features/chat/chat_screen.dart';
 import '../../features/verdict/verdict_screen.dart';
 import '../../features/feed/feed_screen.dart';
-import '../../features/history/history_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/url_scanner/url_scanner_screen.dart';
 import '../../features/wifi_scanner/wifi_scanner_screen.dart';
@@ -17,6 +16,9 @@ import '../../features/app_scanner/app_scanner_screen.dart';
 import '../../features/home/otp_guard_screen.dart';
 import '../../features/home/call_shield_screen.dart';
 import '../../features/home/sms_inbox_screen.dart';
+import '../../features/upi_scanner/upi_scanner_screen.dart';
+import '../../features/device_audit/device_audit_screen.dart';
+import '../../features/email_breach/email_breach_screen.dart';
 import '../../data/models/verdict_model.dart';
 import '../constants.dart';
 
@@ -67,6 +69,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SmsInboxScreen(),
       ),
       GoRoute(
+        path: '/upi-scanner',
+        builder: (context, state) => const UpiScannerScreen(),
+      ),
+      GoRoute(
+        path: '/device-audit',
+        builder: (context, state) => const DeviceAuditScreen(),
+      ),
+      GoRoute(
+        path: '/email-breach',
+        builder: (context, state) => const EmailBreachScreen(),
+      ),
+      GoRoute(
         path: '/verdict',
         builder: (context, state) {
           final verdict = state.extra as VerdictModel;
@@ -91,8 +105,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const FeedScreen(),
           ),
           GoRoute(
-            path: '/history',
-            builder: (context, state) => const HistoryScreen(),
+            path: '/upi-scanner',
+            builder: (context, state) => const UpiScannerScreen(),
           ),
           GoRoute(
             path: '/settings',
@@ -279,7 +293,7 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
 
-  static const _routes = ['/home', '/chat', '/feed', '/history', '/settings'];
+  static const _routes = ['/home', '/chat', '/feed', '/upi-scanner', '/settings'];
 
   @override
   Widget build(BuildContext context) {
@@ -317,9 +331,9 @@ class _MainShellState extends State<MainShell> {
               label: 'Alerts',
             ),
             NavigationDestination(
-              icon: Icon(Icons.history_outlined),
-              selectedIcon: Icon(Icons.history),
-              label: 'History',
+              icon: Icon(Icons.qr_code_scanner_outlined),
+              selectedIcon: Icon(Icons.qr_code_scanner),
+              label: 'QR Scan',
             ),
             NavigationDestination(
               icon: Icon(Icons.settings_outlined),

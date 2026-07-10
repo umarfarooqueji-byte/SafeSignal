@@ -56,6 +56,9 @@ dependencies:
   permission_handler: ^12.0.3
   url_launcher: ^6.3.2
   mobile_scanner: ^7.2.0
+  crypto: ^3.0.6
+  safe_device: ^1.4.1
+  flutter_dotenv: ^6.0.1
 
 dev_dependencies:
   flutter_test:
@@ -80,6 +83,7 @@ flutter:
 
   assets:
     - assets/images/
+    - .env
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

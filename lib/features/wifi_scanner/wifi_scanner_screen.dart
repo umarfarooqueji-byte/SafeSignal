@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:dio/dio.dart';
 import '../../core/widgets/arc_gauge.dart';
 
 class WifiScannerScreen extends StatefulWidget {
@@ -160,6 +161,81 @@ class _WifiScannerScreenState extends State<WifiScannerScreen> {
         icon: Icons.router,
       ));
     }
+
+    // ─── ACTIVE DEEP NETWORK INSPECTION ────────────────────────────────────────
+
+    // 1. Captive Portal Detection (Man-in-the-Middle Trap)
+    try {
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 3),
+        receiveTimeout: const Duration(seconds: 3),
+        validateStatus: (status) => true,
+      ));
+      
+      final portalRes = await dio.get('http://connectivitycheck.gstatic.com/generate_204');
+      if (portalRes.statusCode != 204) {
+        score -= 40;
+        checks.add(const _Check(
+          label: 'Captive Portal Interception',
+          detail: 'Koi login page ya portal aapka connection intercept kar raha hai! Data leak ka khatra.',
+          level: _Level.danger,
+          icon: Icons.warning_amber_rounded,
+        ));
+      } else {
+        checks.add(const _Check(
+          label: 'Connection Interception',
+          detail: 'Direct internet access. Koi interception nahi.',
+          level: _Level.safe,
+          icon: Icons.shield_outlined,
+        ));
+      }
+
+      // 2. SSL Stripping & DNS Hijacking Check + Ping Latency
+      final stopwatch = Stopwatch()..start();
+      try {
+        final sslRes = await dio.get('https://1.1.1.1');
+        stopwatch.stop();
+        
+        if (sslRes.statusCode == 200) {
+          checks.add(const _Check(
+            label: 'DNS & SSL Secure',
+            detail: 'DNS hijacking nahi hai. SSL connection strongly encrypted hai.',
+            level: _Level.safe,
+            icon: Icons.lock_clock,
+          ));
+
+          final latency = stopwatch.elapsedMilliseconds;
+          if (latency > 2000) {
+            score -= 15;
+            checks.add(_Check(
+              label: 'Network Latency Anomalies',
+              detail: 'Ping bohot high hai (${latency}ms). Shayad koi Evil-Twin network data relay kar raha hai.',
+              level: _Level.warning,
+              icon: Icons.speed,
+            ));
+          }
+        }
+      } catch (e) {
+        // SSL Certificate error or DNS timeout = HIGH DANGER
+        score -= 60;
+        checks.add(const _Check(
+          label: 'SSL Stripping / DNS Hijack',
+          detail: 'CRITICAL: HTTPS connection fail hua! Network encrypted traffic break karne ki koshish kar raha hai.',
+          level: _Level.critical,
+          icon: Icons.gpp_bad,
+        ));
+      }
+    } catch (e) {
+      // Offline ya totally unreachable
+      checks.add(const _Check(
+        label: 'Internet Connection',
+        detail: 'Active internet nahi mil raha (offline mode).',
+        level: _Level.warning,
+        icon: Icons.cloud_off,
+      ));
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
 
     score = score.clamp(0, 100);
     final rating = (score / 20).clamp(0.0, 5.0); // 0-100 → 0-5

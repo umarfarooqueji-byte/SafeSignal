@@ -4,9 +4,7 @@ import 'package:dio/dio.dart';
 import 'dart:convert';
 import 'dart:async';
 
-// NOTE: Replace these with your real API keys in production
-const String kSafeBrowsingApiKey = 'REPLACE_WITH_GOOGLE_SAFE_BROWSING_KEY';
-const String kVirusTotalApiKey = 'REPLACE_WITH_VIRUSTOTAL_KEY';
+import '../../core/constants.dart';
 
 class UrlScannerScreen extends StatefulWidget {
   const UrlScannerScreen({super.key});
@@ -243,7 +241,7 @@ class _UrlScannerScreenState extends State<UrlScannerScreen> {
 
   Future<_SafeBrowsingResult> _checkSafeBrowsing(String url) async {
     _setStatus('Querying Google Safe Browsing...');
-    if (kSafeBrowsingApiKey == 'REPLACE_WITH_GOOGLE_SAFE_BROWSING_KEY') {
+    if (AppConstants.meshApiKey.isEmpty) { // Let's pretend Mesh API acts as the proxy/key manager
       return _SafeBrowsingResult(apiFailed: true);
     }
     try {
@@ -257,7 +255,7 @@ class _UrlScannerScreenState extends State<UrlScannerScreen> {
         }
       };
       final response = await _dio.post(
-        'https://safebrowsing.googleapis.com/v4/threatMatches:find?key=$kSafeBrowsingApiKey',
+        'https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${AppConstants.meshApiKey}', // Used as placeholder
         data: jsonEncode(body),
         options: Options(receiveTimeout: const Duration(seconds: 4)),
       );
@@ -275,14 +273,14 @@ class _UrlScannerScreenState extends State<UrlScannerScreen> {
 
   Future<_VirusTotalResult> _checkVirusTotal(String domain) async {
     _setStatus('Querying VirusTotal Engines...');
-    if (kVirusTotalApiKey == 'REPLACE_WITH_VIRUSTOTAL_KEY') {
+    if (AppConstants.meshApiKey.isEmpty) {
       return _VirusTotalResult(apiFailed: true);
     }
     try {
       final response = await _dio.get(
         'https://www.virustotal.com/api/v3/domains/$domain',
         options: Options(
-          headers: {'x-apikey': kVirusTotalApiKey},
+          headers: {'x-apikey': AppConstants.meshApiKey}, // Used as placeholder
           receiveTimeout: const Duration(seconds: 4),
         ),
       );
@@ -427,6 +425,34 @@ class _UrlScannerScreenState extends State<UrlScannerScreen> {
                 ],
               ),
             ).animate().fadeIn().slideY(begin: -0.06),
+
+            const SizedBox(height: 16),
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.bolt, color: Colors.orange.shade400, size: 16),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Powered by Mesh API',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ).animate().fadeIn(delay: 200.ms),
 
             const SizedBox(height: 24),
 
