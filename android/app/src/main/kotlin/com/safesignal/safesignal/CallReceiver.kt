@@ -15,6 +15,10 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.provider.ContactsContract
+import android.net.Uri
+import android.Manifest
+import android.content.pm.PackageManager
 
 /**
  * BroadcastReceiver that listens for incoming calls and shows
@@ -51,7 +55,7 @@ class CallReceiver : BroadcastReceiver() {
         when (state) {
             TelephonyManager.EXTRA_STATE_RINGING -> {
                 // Incoming call — analyze and show overlay
-                val analysis = analyzeNumber(phoneNumber)
+                val analysis = analyzeNumber(context, phoneNumber)
                 showOverlay(context, phoneNumber, analysis)
             }
             TelephonyManager.EXTRA_STATE_IDLE,
@@ -69,10 +73,48 @@ class CallReceiver : BroadcastReceiver() {
         val emoji: String,
         val bgColor: Int,
         val textColor: Int,
+        val displayName: String? = null // To hold real person name
     )
+    
+    private fun getContactName(context: Context, phoneNumber: String): String? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+                return null
+            }
+        }
+        
+        try {
+            val uri = Uri.withAppendedPath(
+                ContactsContract.PhoneLookup.CONTENT_FILTER_URI, 
+                Uri.encode(phoneNumber)
+            )
+            val projection = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME)
+            context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    return cursor.getString(0)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return null
+    }
 
-    private fun analyzeNumber(number: String): CallAnalysis {
+    private fun analyzeNumber(context: Context, number: String): CallAnalysis {
         val clean = number.replace(Regex("[\\s\\-()]+"), "")
+        
+        val contactName = getContactName(context, clean)
+        if (contactName != null) {
+            return CallAnalysis(
+                verdict = "SAFE",
+                confidence = 100,
+                reason = "Real person — Saved in your contacts",
+                emoji = "✅",
+                bgColor = Color.parseColor("#1B5E20"),
+                textColor = Color.WHITE,
+                displayName = contactName
+            )
+        }
 
         // Check if number is empty / private / withheld
         if (clean.isEmpty() || clean == "Unknown" || clean == "-1") {
@@ -115,7 +157,7 @@ class CallReceiver : BroadcastReceiver() {
         }
 
         // Short numbers (government, services)
-        if (clean.length <= 5) {
+        if (clean.length in 3..5) {
             return CallAnalysis(
                 verdict = "SAFE",
                 confidence = 75,
@@ -207,12 +249,23 @@ class CallReceiver : BroadcastReceiver() {
                     setPadding(0, 16, 0, 4)
                 }
 
-                // Phone number
+                // Phone number or Contact Name
                 val numberText = TextView(context).apply {
-                    text = phoneNumber
+                    text = analysis.displayName ?: phoneNumber
                     setTextColor(Color.WHITE)
                     textSize = 22f
                     setTypeface(null, android.graphics.Typeface.BOLD)
+                }
+                
+                // If it's a known contact, also show the phone number small underneath
+                var subNumberText: TextView? = null
+                if (analysis.displayName != null) {
+                    subNumberText = TextView(context).apply {
+                        text = phoneNumber
+                        setTextColor(Color.parseColor("#A0FFFFFF"))
+                        textSize = 12f
+                        setPadding(0, 0, 0, 8)
+                    }
                 }
 
                 // Verdict badge
@@ -223,6 +276,12 @@ class CallReceiver : BroadcastReceiver() {
                     textSize = 14f
                     setTypeface(null, android.graphics.Typeface.BOLD)
                     setPadding(28, 12, 28, 12)
+                }
+                
+                // Wrapper for badge to allow margins if needed
+                val badgeWrapper = LinearLayout(context).apply {
+                    setPadding(0, 12, 0, 0)
+                    addView(verdictBadge)
                 }
 
                 // Reason
@@ -236,11 +295,10 @@ class CallReceiver : BroadcastReceiver() {
                 container.addView(brandRow)
                 container.addView(incomingLabel)
                 container.addView(numberText)
-                val space = View(context).apply {
-                    minimumHeight = 16
+                if (subNumberText != null) {
+                    container.addView(subNumberText)
                 }
-                container.addView(space)
-                container.addView(verdictBadge)
+                container.addView(badgeWrapper)
                 container.addView(reasonText)
 
                 val params = WindowManager.LayoutParams(

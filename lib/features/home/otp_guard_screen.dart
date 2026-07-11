@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -54,61 +55,36 @@ class _OtpGuardScreenState extends State<OtpGuardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header card
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0A1A38), Color(0xFF0D2050)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF2979FF).withValues(alpha: 0.25),
-                      blurRadius: 30,
-                      offset: const Offset(0, 10),
+              Column(
+                children: [
+                  const Icon(
+                    Icons.security_rounded,
+                    color: Color(0xFF2979FF),
+                    size: 56,
+                  ).animate().scale(begin: const Offset(0.7, 0.7)).fadeIn(),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Real-time OTP Protection',
+                    style: TextStyle(
+                      color: Color(0xFF1565C0),
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
                     ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.security_rounded,
-                        color: Color(0xFF2979FF),
-                        size: 36,
-                      ),
+                    textAlign: TextAlign.center,
+                  ).animate().fadeIn().slideY(begin: -0.06),
+                  const SizedBox(height: 8),
+                  Text(
+                    'SafeSignal runs in the background to monitor OTP theft attempts and unauthorized forwarding.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: isDark ? Colors.white54 : Colors.black54,
+                      fontSize: 14,
+                      height: 1.4,
                     ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Real-time OTP Protection',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'SafeSignal runs in the background to monitor OTP theft attempts and unauthorized forwarding.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ).animate().fadeIn().scale(begin: const Offset(0.95, 0.95)),
+                  ).animate().fadeIn(delay: 100.ms),
+                ],
+              ),
               const SizedBox(height: 24),
 
               // Status Card

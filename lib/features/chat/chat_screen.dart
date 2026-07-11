@@ -34,13 +34,13 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
     if (lang == 'hi') {
       return const ChatMessage(
         text:
-            '🛡️ Namaste! Main SafeSignal AI Security Shield hoon.\n\nKoi bhi suspicious message, SMS, email, ya link yahan copy-paste karein — main bata dunga ye SCAM hai ya SAFE hai, aur kyun hai.\n\n📸 Screenshot bhi upload kar sakte hain — main image bhi scan karta hoon.\n\n🔒 Aapki privacy bilkul safe hai.',
+            '🛡️ Namaste! Main SafeSignal AI Cyber Expert hoon.\n\nMain ek elite cybersecurity expert hoon jo aapko:\n• Kisi bhi suspicious message, link ya screenshot ki jaanch karna\n• Cyber fraud, scam, phishing se bachne ke tarike batana\n• Android security, app permissions, VPN, password tips\n• Digital arrest, OTP scam, loan app fraud — koi bhi cyber threat\n\nAap seedha kuch bhi pooch sakte hain ya koi suspicious message paste kar sakte hain. Screenshot upload bhi kar sakte hain.\n\n🔒 Aapki privacy 100% protected hai.',
         isUser: false,
       );
     } else {
       return const ChatMessage(
         text:
-            '🛡️ Hello! I am SafeSignal AI Security Shield.\n\nPaste any suspicious message, SMS, email, or link here — I will tell you if it is a SCAM or SAFE and explain why in detail.\n\n📸 You can also upload a screenshot — I scan images too.\n\n🔒 Your privacy is fully protected.',
+            '🛡️ Hello! I am SafeSignal AI Cyber Expert.\n\nI am a trained cybersecurity expert who can:\n• Analyze any suspicious message, link or screenshot\n• Teach you how to stay safe from fraud & phishing\n• Advise on Android security, VPN, passwords, app permissions\n• Explain any cyber threat: digital arrest, OTP scam, loan fraud\n\nAsk me anything or paste a suspicious message below. You can also upload screenshots for analysis.\n\n🔒 Your privacy is fully protected.',
         isUser: false,
       );
     }
@@ -63,10 +63,6 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
     VerdictModel verdict;
 
     try {
-      if (AppConstants.meshApiKey.isEmpty || AppConstants.meshApiKey == 'YOUR_MESH_API_KEY') {
-        throw Exception('API Key not set');
-      }
-
       verdict = await _analyzeWithAI(text, image, language);
     } catch (e) {
       debugPrint('AI Analysis failed, falling back to heuristics: $e');
@@ -78,51 +74,87 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
     }
 
     state = state.where((m) => !m.isLoading).toList();
-    state = [...state, ChatMessage(text: '', isUser: false, verdict: verdict)];
+    if (verdict.verdict == 'INFO') {
+      final infoText = verdict.why.isNotEmpty ? verdict.why.join('\n\n') : 'Kuch samajh nahi aaya, kripya dobara likhein.';
+      state = [...state, ChatMessage(text: infoText, isUser: false, verdict: null)];
+    } else {
+      state = [...state, ChatMessage(text: '', isUser: false, verdict: verdict)];
+    }
   }
 
   Future<VerdictModel> _analyzeWithAI(String text, File? image, String language) async {
     final dio = Dio();
+    // Use OpenRouter as primary — key is always available
+    final apiKey = AppConstants.openRouterApiKey.isNotEmpty
+        ? AppConstants.openRouterApiKey
+        : AppConstants.meshApiKey;
+    final endpoint = AppConstants.openRouterApiKey.isNotEmpty
+        ? 'https://openrouter.ai/api/v1/chat/completions'
+        : 'https://api.meshapi.ai/v1/chat/completions';
+    final model = AppConstants.openRouterApiKey.isNotEmpty
+        ? 'anthropic/claude-3-haiku'
+        : 'openai/gpt-4o-mini';
+
     dio.options.headers = {
-      'Authorization': 'Bearer ${AppConstants.meshApiKey}',
+      'Authorization': 'Bearer $apiKey',
       'Content-Type': 'application/json',
+      if (AppConstants.openRouterApiKey.isNotEmpty) 'HTTP-Referer': 'https://safesignal.app',
     };
-    dio.options.connectTimeout = const Duration(seconds: 20);
-    dio.options.receiveTimeout = const Duration(seconds: 20);
+    dio.options.connectTimeout = const Duration(seconds: 25);
+    dio.options.receiveTimeout = const Duration(seconds: 25);
 
     final messages = <Map<String, dynamic>>[];
 
     final langName = language == 'hi' ? 'Hindi (Devanagari script preferred, or Hinglish is acceptable)' : 'English';
 
     final systemPrompt = """
-You are SafeSignal — an elite AI cybersecurity expert specializing in Indian digital fraud detection.
-Your role: Analyze the provided message/image and give a DETAILED professional security verdict.
+You are SafeSignal — an elite AI cybersecurity expert and digital safety advisor specializing in Indian cyber threats.
 
+You have deep expertise in:
+- Detecting Indian cyber frauds: Digital Arrest, OTP scam, KYC fraud, loan app fraud, investment fraud, phishing, SIM swapping, WhatsApp hijacking, UPI fraud
+- Android & iOS mobile security, app permissions, privacy settings
+- Password security, 2FA, VPN, secure DNS
+- Network security, data breaches, dark web monitoring
+- Govt cybercrime reporting (1930 helpline, cybercrime.gov.in, CERT-In)
+
+When analyzing a suspicious message/image:
+If the user is just having a normal conversation (e.g. saying hello, asking who you are, or asking general cybersecurity questions), DO NOT analyze it as a scam. Instead, respond with verdict "INFO" and provide a conversational, helpful reply in the "why" array (as a single item).
+ONLY analyze a message as a SCAM or SAFE if the user actually shares a suspicious link, message, or explicitly asks you to analyze something.
 RESPOND ONLY WITH A VALID JSON OBJECT — no markdown, no code blocks, just raw JSON:
 {
   "verdict": "SCAM" or "LIKELY_SAFE" or "UNCERTAIN",
   "confidence": 0.0 to 1.0,
-  "scamType": one of ["digital_arrest", "lottery_prize", "job_fraud", "bank_phishing", "otp_theft", "investment_fraud", "fake_news", "malware_link", "impersonation", "romance_scam", "none"],
+  "scamType": one of ["digital_arrest", "lottery_prize", "job_fraud", "bank_phishing", "otp_theft", "investment_fraud", "fake_news", "malware_link", "impersonation", "romance_scam", "loan_app", "upi_fraud", "sim_swap", "none"],
   "riskLevel": "HIGH" or "MEDIUM" or "LOW",
   "why": [
-    "Detailed point 1 explaining the specific red flags found",
-    "Detailed point 2 about what makes this suspicious or safe",
-    "Detailed point 3 — include any patterns, keywords, sender behavior",
-    "Detailed point 4 if applicable"
+    "Detailed specific red flag 1 with exact evidence from the message",
+    "Red flag 2 — specific tactics used by fraudsters",
+    "Red flag 3 — behavioral or linguistic patterns",
+    "Additional context about this scam type in India"
   ],
   "whatToDo": [
-    "Clear actionable step 1",
-    "Clear actionable step 2",
-    "Clear actionable step 3",
-    "Emergency contacts or reporting channels if needed"
+    "Immediate actionable step 1",
+    "Step 2",
+    "Step 3 — reporting channel with exact URL or phone number",
+    "Long-term protective measure"
   ],
-  "summary": "One short paragraph (2-3 sentences) summarizing the verdict in plain simple language"
+  "summary": "2-3 sentence plain language summary of the verdict and main risk"
 }
 
-IMPORTANT: Write ALL text fields (why, whatToDo, summary) ENTIRELY in $langName.
-Be detailed, specific, and educational. Mention actual tactics used by Indian fraudsters.
-If image: scan carefully for fake logos, official headers, bank seals, watermarks, phone numbers.
-If text: check sender ID format, URLs, urgency language, threats, money requests.
+For general cybersecurity questions (NOT scam analysis), respond with:
+{
+  "verdict": "INFO",
+  "confidence": 1.0,
+  "scamType": "none",
+  "riskLevel": "LOW",
+  "why": ["Full detailed expert answer as a single item in this array"],
+  "whatToDo": ["Practical tip 1", "Practical tip 2", "Practical tip 3"],
+  "summary": "Brief summary of the advice"
+}
+
+IMPORTANT: Write ALL text fields ENTIRELY in $langName. Be specific, educational, and practical.
+Mention real Indian fraud tactics, actual reporting channels (1930, cybercrime.gov.in, CERT-In).
+If image: scan for fake logos, official headers, bank seals, QR codes, suspicious URLs.
 """;
 
     messages.add({'role': 'system', 'content': systemPrompt});
@@ -152,20 +184,17 @@ If text: check sender ID format, URLs, urgency language, threats, money requests
     } else {
       messages.add({
         'role': 'user',
-        'content': 'Analyze this message for scam/fraud: "$text"'
+        'content': text
       });
     }
 
     final payload = {
-      'model': 'openai/gpt-4o-mini',
+      'model': model,
       'messages': messages,
       'response_format': {'type': 'json_object'},
     };
 
-    final response = await dio.post(
-      'https://api.meshapi.ai/v1/chat/completions',
-      data: payload,
-    );
+    final response = await dio.post(endpoint, data: payload);
 
     if (response.statusCode == 200) {
       final choices = response.data['choices'] as List;
@@ -280,7 +309,22 @@ If text: check sender ID format, URLs, urgency language, threats, money requests
     if (scamScore == 1 && safeScore == 0) return VerdictModel.mockCaution();
     if (safeScore >= 1 || isOtp) return VerdictModel.mockSafe();
     if (lower.contains('http') || lower.contains('www.')) return VerdictModel.mockCaution();
-    return VerdictModel.mockCaution();
+    
+    // Normal conversation fallback
+    return VerdictModel(
+      checkId: 'local_${DateTime.now().millisecondsSinceEpoch}',
+      verdict: 'INFO',
+      confidence: 1.0,
+      scamType: 'none',
+      escalated: false,
+      why: isHindi ? ['Main SafeSignal AI hoon. Aap koi suspicious message ya link paste karke check karwa sakte hain.'] : ['I am SafeSignal AI. You can paste a suspicious message or link for analysis.'],
+      whatToDo: [],
+      trendNote: null,
+      language: language,
+      disclaimer: '',
+      inputText: text,
+      checkedAt: DateTime.now(),
+    );
   }
 
   Future<VerdictModel> _analyzeImageHeuristics(File image, String hint, String language) async {
@@ -446,31 +490,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (messages.isNotEmpty) _scrollToBottom();
 
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.darkBg : AppTheme.lightBg,
+      extendBodyBehindAppBar: true,
+      backgroundColor: const Color(0xFFE3F2FD),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0D1117), size: 22),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Row(
           children: [
-            Container(
+            Image.asset(
+              'assets/images/logo_transparent.png',
               width: 38,
               height: 38,
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGrad,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.shield_outlined, color: Colors.white, size: 20),
             ),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'AI Chat Shield',
+                const Text(
+                  'AI Cyber Assistant',
                   style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                    color: isDark ? Colors.white : AppTheme.darkSurface,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
+                    color: Color(0xFF0D1117),
                     letterSpacing: -0.3,
                   ),
                 ),
@@ -480,16 +526,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       width: 8,
                       height: 8,
                       decoration: const BoxDecoration(
-                        color: AppTheme.safeGreen,
+                        color: Color(0xFF4CAF50),
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Text(
+                    const Text(
                       'Live Protection Active',
                       style: TextStyle(
                         fontSize: 11,
-                        color: isDark ? Colors.white54 : Colors.black45,
+                        color: Colors.black54,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -502,15 +548,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         actions: [
           IconButton(
             onPressed: () => ref.read(chatProvider.notifier).clear(),
-            icon: Icon(Icons.refresh, color: isDark ? Colors.white70 : Colors.black87),
+            icon: const Icon(Icons.refresh, color: Color(0xFF0D1117)),
             tooltip: 'Clear chat',
           ),
           const SizedBox(width: 8),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFE3F2FD), Color(0xFFBBDEFB), Color(0xFF90CAF9)],
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Expanded(
             child: ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -565,7 +621,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
           // Input Bar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 12,
+              bottom: 12 + MediaQuery.of(context).padding.bottom,
+            ),
             decoration: BoxDecoration(
               color: isDark ? AppTheme.darkCard : Colors.white,
               border: Border(
@@ -659,6 +720,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
         ],
+      ),
+      ),
       ),
     );
   }

@@ -13,9 +13,13 @@ class AppConstants {
 
   // AI APIs
   static String get grokApiKey => dotenv.env['GROK_API_KEY'] ?? '';
+  static String get deepSeekApiKey => dotenv.env['DEEPSEEK_API_KEY'] ?? '';
+  static String get openRouterApiKey => dotenv.env['OPENROUTER_API_KEY'] ?? '';
 
   // Have I Been Pwned (Phase 3)
   static String get hibpApiKey => dotenv.env['HIBP_API_KEY'] ?? '';
+  static String get googleSafeBrowsingApiKey => dotenv.env['SAFE_BROWSING_API_KEY'] ?? '';
+  static String get virusTotalApiKey => dotenv.env['VIRUSTOTAL_API_KEY'] ?? '';
 
   // Crowd Intel Settings
   static const int crowdReportThreshold = 5; // 5+ reports → verified blocklist

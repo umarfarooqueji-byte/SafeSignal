@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/widgets/arc_gauge.dart';
@@ -115,13 +116,14 @@ class _AppScannerScreenState extends State<AppScannerScreen>
     const textColor = Color(0xFF1E293B);
 
     return Scaffold(
-      backgroundColor: bg,
+      extendBodyBehindAppBar: true,
+      backgroundColor: const Color(0xFFE3F2FD),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: textColor, size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0D1117), size: 22),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
@@ -129,18 +131,30 @@ class _AppScannerScreenState extends State<AppScannerScreen>
           style: TextStyle(
             fontWeight: FontWeight.w900,
             fontSize: 22,
-            color: textColor,
+            color: Color(0xFF0D1117),
+            letterSpacing: -0.5,
           ),
         ),
         centerTitle: true,
       ),
-      body: _phase == _Phase.idle
-          ? _buildIdle()
-          : _phase == _Phase.scanning
-              ? _buildScanning()
-              : _phase == _Phase.error
-                  ? _buildError()
-                  : _buildResults(),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFE3F2FD), Color(0xFFBBDEFB), Color(0xFF90CAF9)],
+          ),
+        ),
+        child: SafeArea(
+          child: _phase == _Phase.idle
+              ? _buildIdle()
+              : _phase == _Phase.scanning
+                  ? _buildScanning()
+                  : _phase == _Phase.error
+                      ? _buildError()
+                      : _buildResults(),
+        ),
+      ),
     );
   }
 
@@ -151,25 +165,10 @@ class _AppScannerScreenState extends State<AppScannerScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 110,
-              height: 110,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF0F172A).withValues(alpha: 0.15),
-                    blurRadius: 28,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: const Icon(Icons.android_rounded, size: 56, color: Colors.white),
+            const Icon(
+              Icons.android_rounded,
+              size: 56,
+              color: AppTheme.primary,
             ).animate().scale(begin: const Offset(0.7, 0.7)).fadeIn(),
             const SizedBox(height: 28),
             const Text(
@@ -177,7 +176,7 @@ class _AppScannerScreenState extends State<AppScannerScreen>
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w900,
-                color: Color(0xFF1E293B),
+                color: Color(0xFF1565C0),
               ),
             ).animate().fadeIn(delay: 100.ms),
             const SizedBox(height: 10),
@@ -196,7 +195,7 @@ class _AppScannerScreenState extends State<AppScannerScreen>
               icon: const Icon(Icons.radar, size: 22),
               label: const Text('Start Full Scan'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F172A),
+                backgroundColor: AppTheme.primary,
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(56),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

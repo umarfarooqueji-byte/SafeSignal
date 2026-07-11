@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import '../../core/services/supabase_service.dart';
+import '../../core/theme/app_theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:dio/dio.dart';
 import 'dart:convert';
@@ -54,6 +57,19 @@ class _UrlScannerScreenState extends State<UrlScannerScreen> {
 
     try {
       final result = await _analyzeUrl(url);
+
+      // Save to Supabase
+      try {
+        await SupabaseService().saveScanHistory(
+          scanType: 'URL',
+          target: url,
+          status: result.verdict == UrlVerdict.dangerous ? 'DANGER' : (result.verdict == UrlVerdict.caution ? 'WARNING' : 'SAFE'),
+          details: {'riskScore': result.riskScore, 'domain': result.domain},
+        );
+      } catch (e) {
+        debugPrint('Supabase save error: $e');
+      }
+
       if (!mounted) return;
       setState(() {
         _state = _ScanState.done;
@@ -241,7 +257,7 @@ class _UrlScannerScreenState extends State<UrlScannerScreen> {
 
   Future<_SafeBrowsingResult> _checkSafeBrowsing(String url) async {
     _setStatus('Querying Google Safe Browsing...');
-    if (AppConstants.meshApiKey.isEmpty) { // Let's pretend Mesh API acts as the proxy/key manager
+    if (AppConstants.googleSafeBrowsingApiKey.isEmpty) { 
       return _SafeBrowsingResult(apiFailed: true);
     }
     try {
@@ -255,7 +271,7 @@ class _UrlScannerScreenState extends State<UrlScannerScreen> {
         }
       };
       final response = await _dio.post(
-        'https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${AppConstants.meshApiKey}', // Used as placeholder
+        'https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${AppConstants.googleSafeBrowsingApiKey}',
         data: jsonEncode(body),
         options: Options(receiveTimeout: const Duration(seconds: 4)),
       );
@@ -273,14 +289,14 @@ class _UrlScannerScreenState extends State<UrlScannerScreen> {
 
   Future<_VirusTotalResult> _checkVirusTotal(String domain) async {
     _setStatus('Querying VirusTotal Engines...');
-    if (AppConstants.meshApiKey.isEmpty) {
+    if (AppConstants.virusTotalApiKey.isEmpty) {
       return _VirusTotalResult(apiFailed: true);
     }
     try {
       final response = await _dio.get(
         'https://www.virustotal.com/api/v3/domains/$domain',
         options: Options(
-          headers: {'x-apikey': AppConstants.meshApiKey}, // Used as placeholder
+          headers: {'x-apikey': AppConstants.virusTotalApiKey},
           receiveTimeout: const Duration(seconds: 4),
         ),
       );
@@ -337,264 +353,204 @@ class _UrlScannerScreenState extends State<UrlScannerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Premium White Theme Enforcement
-    const bg = Color(0xFFF8F9FB);
-    const textColor = Color(0xFF1E293B);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF06090F) : const Color(0xFFEBF3FA); // Light blue tint matching app theme
+    final textColor = isDark ? Colors.white : const Color(0xFF1E293B);
+    
+    // Determine gauge score and status text
+    double gaugeScore = 0;
+    String statusText = '';
+    Color statusColor = Colors.transparent;
+
+    if (_state == _ScanState.done && _result != null) {
+      gaugeScore = _result!.riskScore.toDouble();
+      if (_result!.verdict == UrlVerdict.dangerous) {
+        statusText = 'Unsafe';
+        statusColor = Colors.redAccent.shade400;
+      } else if (_result!.verdict == UrlVerdict.caution) {
+        statusText = 'Suspicious';
+        statusColor = Colors.orangeAccent.shade400;
+      } else {
+        statusText = 'Safe';
+        statusColor = Colors.greenAccent.shade400;
+      }
+    } else if (_state == _ScanState.scanning) {
+      statusText = 'Scanning...';
+      statusColor = AppTheme.primary;
+    }
 
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: textColor, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new, color: textColor, size: 22),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Website Checker',
+        title: Text(
+          'Scan Link',
           style: TextStyle(
             fontWeight: FontWeight.w900,
             fontSize: 22,
             color: textColor,
+            letterSpacing: -0.5,
           ),
         ),
+        centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header card (Premium Style)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(height: 24),
+              // Gauge
+              TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0, end: gaugeScore),
+                duration: const Duration(milliseconds: 1000),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, child) {
+                  return SpeedometerGauge(score: value);
+                },
+              ),
+              const SizedBox(height: 16),
+              // Status Text
+              Text(
+                statusText,
+                style: TextStyle(
+                  color: statusColor,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
                 ),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF0F172A).withValues(alpha: 0.15),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Icon(Icons.shield_rounded, color: Colors.white, size: 28),
-                      ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'URL Deep Scanner',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            Text(
-                              'SafeBrowsing & VirusTotal Active',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ).animate().fadeIn().slideY(begin: -0.06),
+              ).animate(target: statusText.isNotEmpty ? 1 : 0).fadeIn(),
+              
+              const SizedBox(height: 48),
 
-            const SizedBox(height: 16),
-            Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              // TextField mimicking the screenshot
+              Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: _state == _ScanState.scanning 
+                        ? AppTheme.primary 
+                        : (isDark ? Colors.white24 : Colors.black12),
+                    width: 2,
+                  ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                child: Stack(
+                  clipBehavior: Clip.none,
                   children: [
-                    Icon(Icons.bolt, color: Colors.orange.shade400, size: 16),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'Powered by Mesh API',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF64748B),
-                        letterSpacing: 0.5,
+                    TextField(
+                      controller: _controller,
+                      enabled: _state != _ScanState.scanning,
+                      style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w500),
+                      decoration: InputDecoration(
+                        prefixText: 'https://',
+                        prefixStyle: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w500),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                        suffixIcon: Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: Icon(Icons.search, color: isDark ? Colors.white54 : Colors.black54),
+                        ),
+                      ),
+                      onSubmitted: (_) => _scan(),
+                    ),
+                    Positioned(
+                      left: 24,
+                      top: -10,
+                      child: Container(
+                        color: bg,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          'Link',
+                          style: TextStyle(
+                            color: isDark ? Colors.white70 : Colors.black54,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-            ).animate().fadeIn(delay: 200.ms),
-
-            const SizedBox(height: 24),
-
-            // Input field (Premium Light Style)
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: _state == _ScanState.scanning
-                      ? const Color(0xFF2979FF)
-                      : const Color(0xFFE2E8F0),
-                  width: _state == _ScanState.scanning ? 2 : 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const SizedBox(width: 16),
-                  const Icon(Icons.link_rounded, color: Color(0xFF64748B), size: 24),
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      enabled: _state != _ScanState.scanning,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: textColor,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: 'ex: flipkart-sale-offer.com',
-                        hintStyle: TextStyle(color: Color(0xFF94A3B8)),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                      ),
-                      onSubmitted: (_) => _scan(),
-                    ),
-                  ),
-                  if (_state == _ScanState.scanning)
-                    const Padding(
-                      padding: EdgeInsets.only(right: 16),
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF2979FF)),
-                      ),
-                    )
-                  else
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: IconButton(
-                        onPressed: () => _controller.clear(),
-                        icon: const Icon(Icons.close, color: Color(0xFF94A3B8)),
-                      ),
-                    ),
-                ],
-              ),
-            ).animate().fadeIn(delay: 100.ms),
-
-            const SizedBox(height: 20),
-
-            // Scan Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _state == _ScanState.scanning ? null : _scan,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F172A),
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFF94A3B8),
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  'Verify Link',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ).animate().fadeIn(delay: 150.ms),
-
-            if (_state == _ScanState.scanning)
-              Padding(
-                padding: const EdgeInsets.only(top: 32),
-                child: Center(
-                  child: Column(
-                    children: [
-                      const CircularProgressIndicator(color: Color(0xFF2979FF)),
-                      const SizedBox(height: 16),
-                      Text(
-                        _statusMsg,
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-            if (_state == _ScanState.done && _result != null) ...[
-              const SizedBox(height: 32),
-              _buildResultCard(_result!),
-              const SizedBox(height: 24),
-              const Text(
-                'Live Pipeline Checks',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: textColor,
-                ),
-              ),
-              const SizedBox(height: 12),
-              ..._result!.domainChecks.map((check) => _buildCheckItemRow(check)),
-            ],
-
-            if (_state == _ScanState.error)
-              const Padding(
-                padding: EdgeInsets.only(top: 40),
-                child: Center(
+              
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 16),
                   child: Text(
-                    'Network error. Please check your connection and try again.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w600),
+                    'Enter a complete valid url.',
+                    style: TextStyle(
+                      color: isDark ? Colors.white54 : Colors.black54,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ),
-          ],
+
+              const SizedBox(height: 32),
+
+              // Scan Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _state == _ScanState.scanning ? null : _scan,
+                  icon: _state == _ScanState.scanning 
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.language, color: Colors.white70),
+                  label: Text(
+                    _state == _ScanState.scanning ? 'Scanning...' : 'Scan URL',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E293B), // Match screenshot dark pill
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade800,
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                ),
+              ).animate().fadeIn(delay: 150.ms),
+
+              if (_state == _ScanState.done && _result != null) ...[
+                const SizedBox(height: 40),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Live Pipeline Checks',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: textColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ..._result!.domainChecks.map((check) => _buildCheckItemRow(check)),
+              ],
+
+              if (_state == _ScanState.error)
+                const Padding(
+                  padding: EdgeInsets.only(top: 40),
+                  child: Center(
+                    child: Text(
+                      'Network error. Please check your connection and try again.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -839,4 +795,89 @@ class DomainCheckItem {
   final String detail;
 
   DomainCheckItem(this.name, this.passed, this.detail);
+}
+
+class SpeedometerGauge extends StatelessWidget {
+  final double score; // 0 to 100
+  const SpeedometerGauge({super.key, required this.score});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 240,
+      height: 140, // Height is roughly half of width + padding for the needle base
+      child: CustomPaint(
+        painter: _SpeedometerPainter(score),
+      ),
+    );
+  }
+}
+
+class _SpeedometerPainter extends CustomPainter {
+  final double score;
+
+  _SpeedometerPainter(this.score);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height - 20);
+    final radius = size.width / 2;
+    
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 40
+      ..strokeCap = StrokeCap.butt;
+    
+    // Draw the 3 arcs (Green, Orange, Red)
+    final rect = Rect.fromCircle(center: center, radius: radius - 20);
+    
+    // Green (0 to 33)
+    paint.color = Colors.greenAccent.shade400;
+    canvas.drawArc(rect, 3.14159, 3.14159 / 3, false, paint);
+    
+    // Orange (33 to 66)
+    paint.color = Colors.orangeAccent.shade400;
+    canvas.drawArc(rect, 3.14159 + (3.14159 / 3), 3.14159 / 3, false, paint);
+    
+    // Red (66 to 100)
+    paint.color = Colors.redAccent.shade400;
+    canvas.drawArc(rect, 3.14159 + (2 * 3.14159 / 3), 3.14159 / 3, false, paint);
+    
+    // Draw needle
+    // Map score (0-100) to angle (Pi to 2*Pi)
+    // We map a bit inside the bounds so it doesn't go fully horizontal
+    double clampedScore = score.clamp(0.0, 100.0);
+    final angle = 3.14159 + (clampedScore / 100) * 3.14159;
+    
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(angle);
+    
+    final needlePaint = Paint()
+      ..color = const Color(0xFFE0E0E0) // Light grey to work on both themes
+      ..style = PaintingStyle.fill;
+    
+    // Draw needle triangle
+    final path = Path();
+    path.moveTo(0, -6);
+    path.lineTo(radius - 10, 0);
+    path.lineTo(0, 6);
+    path.close();
+    
+    // Add shadow
+    canvas.drawShadow(path, Colors.black, 4, true);
+    canvas.drawPath(path, needlePaint);
+    
+    // Draw center circle
+    canvas.drawCircle(const Offset(0, 0), 16, needlePaint);
+    final innerCirclePaint = Paint()..color = Colors.grey.shade400;
+    canvas.drawCircle(const Offset(0, 0), 10, innerCirclePaint);
+    
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _SpeedometerPainter oldDelegate) {
+    return oldDelegate.score != score;
+  }
 }

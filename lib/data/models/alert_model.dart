@@ -28,6 +28,9 @@ class AlertModel extends HiveObject {
   @HiveField(7)
   final bool isNew;
 
+  @HiveField(8)
+  final String? imageUrl;
+
   AlertModel({
     required this.id,
     required this.headline,
@@ -37,6 +40,7 @@ class AlertModel extends HiveObject {
     required this.publishedAt,
     required this.category,
     required this.isNew,
+    this.imageUrl,
   });
 
   factory AlertModel.fromJson(Map<String, dynamic> json) {
@@ -45,6 +49,7 @@ class AlertModel extends HiveObject {
       headline: json['headline'] ?? '',
       summary: json['summary'] ?? '',
       sourceUrl: json['source_url'],
+      imageUrl: json['image_url'],
       isTrending: json['is_trending'] ?? false,
       publishedAt: DateTime.tryParse(json['published_at'] ?? '') ?? DateTime.now(),
       category: json['category'] ?? 'general',
@@ -62,26 +67,27 @@ class AlertModel extends HiveObject {
           publishedAt: DateTime.now().subtract(const Duration(hours: 2)),
           category: 'digital_arrest',
           isNew: true,
+          imageUrl: 'https://images.unsplash.com/photo-1589829085413-56de8ae18c73?auto=format&fit=crop&w=600&q=80',
         ),
         AlertModel(
-          id: 'alert_002',
-          headline: 'Fake Investment App Alert',
-          summary:
-              'A new investment app promising 300% returns in 30 days is being circulated on WhatsApp. Do not invest.',
-          isTrending: false,
-          publishedAt: DateTime.now().subtract(const Duration(hours: 8)),
-          category: 'investment',
-          isNew: true,
-        ),
-        AlertModel(
-          id: 'alert_003',
-          headline: 'OTP Fraud: नई Technique',
-          summary:
-              'Scammers अब आपके Bank का Customer Care बनकर OTP मांग रहे हैं। Bank कभी OTP नहीं मांगता।',
-          isTrending: false,
-          publishedAt: DateTime.now().subtract(const Duration(days: 1)),
+          id: 'mock_1',
+          headline: 'Massive WhatsApp OTP Scam Uncovered in Delhi',
+          summary: 'Hackers are stealing WhatsApp accounts by tricking users into forwarding SMS OTPs. Never share your 6-digit codes.',
+          isTrending: true,
+          publishedAt: DateTime.now().subtract(const Duration(minutes: 15)),
           category: 'otp',
-          isNew: false,
+          isNew: true,
+          imageUrl: 'https://images.unsplash.com/photo-1614064641913-a520faff8424?auto=format&fit=crop&w=600&q=80',
+        ),
+        AlertModel(
+          id: 'mock_2',
+          headline: 'New "Digital Arrest" Scheme Targeting Seniors',
+          summary: 'Fake police officers are video-calling victims, claiming they are under "digital arrest" for money laundering.',
+          isTrending: true,
+          publishedAt: DateTime.now().subtract(const Duration(hours: 2)),
+          category: 'digital_arrest',
+          isNew: true,
+          imageUrl: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=600&q=80',
         ),
       ];
 }

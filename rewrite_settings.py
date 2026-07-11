@@ -1,5 +1,6 @@
-import 'dart:io';
-import 'package:image_picker/image_picker.dart';
+﻿import os
+
+new_settings = '''import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -94,34 +95,45 @@ class SettingsScreen extends ConsumerWidget {
     final notifier = ref.read(settingsProvider.notifier);
     final profile = ref.watch(profileProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF06090F) : const Color(0xFFEBF3FA);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
         extendBodyBehindAppBar: true,
-        backgroundColor: bg,
+        backgroundColor: const Color(0xFFF0F4F8),
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: Icon(Icons.arrow_back_ios_new, color: isDark ? Colors.white : const Color(0xFF0D1117), size: 22),
+            icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0D1117), size: 22),
             onPressed: () => Navigator.of(context).maybePop(),
           ),
-          title: Text(
+          title: const Text(
             'Settings',
             style: TextStyle(
               fontWeight: FontWeight.w900,
               fontSize: 24,
-              color: isDark ? Colors.white : const Color(0xFF0D1117),
+              color: Color(0xFF0D1117),
               letterSpacing: -0.5,
             ),
           ),
           centerTitle: false,
         ),
-        body: SafeArea(
-          bottom: false,
-          child: ListView(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFFE3F2FD),
+                Color(0xFFBBDEFB),
+                Color(0xFF90CAF9),
+              ],
+            ),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 100),
               physics: const BouncingScrollPhysics(),
               children: [
@@ -132,59 +144,30 @@ class SettingsScreen extends ConsumerWidget {
                       padding: const EdgeInsets.all(20),
                       child: Row(
                         children: [
-                          GestureDetector(
-                            onTap: () async {
-                              try {
-                                final picker = ImagePicker();
-                                final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-                                if (pickedFile != null) {
-                                  final prefs = await SharedPreferences.getInstance();
-                                  await prefs.setString('userProfileImage', pickedFile.path);
-                                  ref.invalidate(profileProvider);
-                                }
-                              } catch (e) {
-                                debugPrint('Error picking image: $e');
-                              }
-                            },
-                            child: Stack(
-                              alignment: Alignment.bottomRight,
-                              children: [
-                                Container(
-                                  width: 76,
-                                  height: 76,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.white,
-                                    border: Border.all(color: Colors.white, width: 3),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.1),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 4),
-                                      )
-                                    ],
-                                    image: data['image'] != null && File(data['image']!).existsSync()
-                                        ? DecorationImage(
-                                            image: FileImage(File(data['image']!)),
-                                            fit: BoxFit.cover,
-                                          )
-                                        : null,
-                                  ),
-                                  child: data['image'] == null || !File(data['image']!).existsSync()
-                                      ? const Icon(Icons.person_rounded, size: 40, color: Color(0xFF2979FF))
-                                      : null,
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF2979FF),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2),
-                                  ),
-                                  child: const Icon(Icons.camera_alt, color: Colors.white, size: 14),
-                                ),
+                          Container(
+                            width: 76,
+                            height: 76,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                              border: Border.all(color: Colors.white, width: 3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                )
                               ],
+                              image: data['image'] != null && File(data['image']!).existsSync()
+                                  ? DecorationImage(
+                                      image: FileImage(File(data['image']!)),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
                             ),
+                            child: data['image'] == null || !File(data['image']!).existsSync()
+                                ? const Icon(Icons.person_rounded, size: 40, color: Color(0xFF2979FF))
+                                : null,
                           ),
                           const SizedBox(width: 20),
                           Expanded(
@@ -342,6 +325,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
         ),
+      ),
     );
   }
 }
@@ -355,26 +339,24 @@ class _PremiumCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF161B27) : Colors.white,
+        color: Colors.white.withOpacity(0.9),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8EEF8),
-        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF1565C0).withOpacity(0.1),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
-        child: child,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: child,
+        ),
       ),
     );
   }
@@ -602,3 +584,6 @@ class _PermRow extends StatelessWidget {
     );
   }
 }
+'''
+with open('lib/features/settings/settings_screen.dart', 'w', encoding='utf-8') as f:
+    f.write(new_settings)

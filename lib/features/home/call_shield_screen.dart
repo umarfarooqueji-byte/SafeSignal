@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -39,76 +40,73 @@ class _CallShieldScreenState extends State<CallShieldScreen> {
     final bg = isDark ? const Color(0xFF060A12) : Colors.white;
 
     return Scaffold(
-      backgroundColor: bg,
+      extendBodyBehindAppBar: true,
+      backgroundColor: const Color(0xFFE3F2FD),
       appBar: AppBar(
-        title: const Text('Call Shield 📞'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: const Text(
+          'Call Shield',
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 22,
+            color: Color(0xFF0D1117),
+            letterSpacing: -0.5,
+          ),
+        ),
+        centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0D1117), size: 22),
           onPressed: () => context.pop(),
         ),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Column(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFE3F2FD), Color(0xFFBBDEFB), Color(0xFF90CAF9)],
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header Card
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1A1F36), Color(0xFF2E1A47)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF7C4DFF).withValues(alpha: 0.25),
-                      blurRadius: 30,
-                      offset: const Offset(0, 10),
+              // Hero card
+              Column(
+                children: [
+                  const Icon(
+                    Icons.call_outlined,
+                    color: AppTheme.primary,
+                    size: 56,
+                  ).animate().scale(begin: const Offset(0.7, 0.7)).fadeIn(),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Advanced Call Protection',
+                    style: TextStyle(
+                      color: Color(0xFF1565C0),
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
                     ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.call_outlined,
-                        color: Color(0xFF7C4DFF),
-                        size: 36,
-                      ),
+                    textAlign: TextAlign.center,
+                  ).animate().fadeIn().slideY(begin: -0.06),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Monitors incoming calls for suspected scammers, CBI/Police digital arrest threats, and lottery traps.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: isDark ? Colors.white54 : Colors.black54,
+                      fontSize: 14,
+                      height: 1.4,
                     ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Advanced Call Protection',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Monitors incoming calls for suspected scammers, CBI/Police digital arrest threats, and lottery traps.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ).animate().fadeIn().scale(begin: const Offset(0.95, 0.95)),
+                  ).animate().fadeIn(delay: 100.ms),
+                ],
+              ),
               const SizedBox(height: 24),
 
               // Status check
@@ -197,6 +195,7 @@ class _CallShieldScreenState extends State<CallShieldScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

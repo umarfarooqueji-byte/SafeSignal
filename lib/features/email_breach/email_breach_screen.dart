@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import '../../core/services/supabase_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/services/hibp_service.dart';
 import '../../core/services/llm_orchestrator.dart';
@@ -48,6 +49,21 @@ class _EmailBreachScreenState extends State<EmailBreachScreen> {
         _phase = _Phase.done;
       });
 
+      // Save to Supabase
+      try {
+        await SupabaseService().saveScanHistory(
+          scanType: 'EMAIL',
+          target: email,
+          status: breaches.isEmpty ? 'SAFE' : 'DANGER',
+          details: {
+            'breachCount': breaches.length,
+            'breachNames': breaches.map((b) => b.title).toList(),
+          },
+        );
+      } catch (e) {
+        debugPrint('Supabase save error: $e');
+      }
+
       // Fetch LLM Verdict
       _fetchVerdict(email, breaches);
 
@@ -84,8 +100,8 @@ class _EmailBreachScreenState extends State<EmailBreachScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF06090F) : const Color(0xFFF8F9FB);
-    final textColor = isDark ? Colors.white : const Color(0xFF0D1117);
+    final bg = isDark ? const Color(0xFF06090F) : const Color(0xFFEBF3FA); // Light blue tint matching app theme
+    final textColor = isDark ? Colors.white : const Color(0xFF1E293B);
 
     return Scaffold(
       backgroundColor: bg,
@@ -94,177 +110,163 @@ class _EmailBreachScreenState extends State<EmailBreachScreen> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, color: textColor, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new, color: textColor, size: 22),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Email Guard',
-          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: textColor),
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 22,
+            color: textColor,
+            letterSpacing: -0.5,
+          ),
         ),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          _buildSearchBar(isDark),
-          Expanded(
-            child: _phase == _Phase.idle
-                ? _buildIdle(isDark)
-                : _phase == _Phase.scanning
-                    ? _buildScanning(isDark)
-                    : _phase == _Phase.error
-                        ? _buildError(isDark)
-                        : _buildResults(isDark),
-          ),
-        ],
-      ),
-    );
-  }
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(height: 16),
+              
+              // Top visual icon (shield/mail)
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C4DFF).withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(CupertinoIcons.mail_solid, size: 50, color: Color(0xFF7C4DFF)),
+              ).animate().scale(begin: const Offset(0.7, 0.7)).fadeIn(),
+              
+              const SizedBox(height: 16),
+              
+              Text(
+                _phase == _Phase.idle 
+                  ? 'Check for Data Breaches' 
+                  : (_phase == _Phase.scanning ? 'Scanning Dark Web...' : 'Scan Complete'),
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+              ).animate(key: ValueKey(_phase)).fadeIn(),
 
-  Widget _buildSearchBar(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.all(22),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.w600),
-              decoration: InputDecoration(
-                hintText: 'Enter your email address...',
-                hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
-                prefixIcon: Icon(CupertinoIcons.mail, color: isDark ? Colors.white54 : Colors.black54),
-                filled: true,
-                fillColor: isDark ? const Color(0xFF161B27) : Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: isDark ? const Color(0xFF30363D) : const Color(0xFFE2E8F0)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: isDark ? const Color(0xFF30363D) : const Color(0xFFE2E8F0)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: Color(0xFF7C4DFF), width: 2),
-                ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              onSubmitted: (_) => _startScan(),
-            ),
-          ),
-          const SizedBox(width: 12),
-          GestureDetector(
-            onTap: _startScan,
-            child: Container(
-              height: 54,
-              width: 54,
-              decoration: BoxDecoration(
-                color: const Color(0xFF7C4DFF),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF7C4DFF).withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+              const SizedBox(height: 48),
+
+              // TextField mimicking Scan Link UI
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: _phase == _Phase.scanning 
+                        ? const Color(0xFF7C4DFF)
+                        : (isDark ? Colors.white24 : Colors.black12),
+                    width: 2,
                   ),
-                ],
+                ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    TextField(
+                      controller: _emailCtrl,
+                      enabled: _phase != _Phase.scanning,
+                      keyboardType: TextInputType.emailAddress,
+                      style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w500),
+                      decoration: InputDecoration(
+                        prefixIcon: Icon(CupertinoIcons.mail, color: isDark ? Colors.white54 : Colors.black54),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                      ),
+                      onSubmitted: (_) => _startScan(),
+                    ),
+                    Positioned(
+                      left: 24,
+                      top: -10,
+                      child: Container(
+                        color: bg,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          'Email',
+                          style: TextStyle(
+                            color: isDark ? Colors.white70 : Colors.black54,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: const Icon(CupertinoIcons.search, color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildIdle(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              color: const Color(0xFF7C4DFF).withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(CupertinoIcons.globe, size: 50, color: Color(0xFF7C4DFF)),
-          ).animate().scale(begin: const Offset(0.7, 0.7)).fadeIn(),
-          const SizedBox(height: 24),
-          Text(
-            'Dark Web Scanner',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: isDark ? Colors.white : const Color(0xFF0D1117),
-            ),
-          ).animate().fadeIn(delay: 100.ms),
-          const SizedBox(height: 10),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Text(
-              'Check karein ki aapka password ya data kisi company ke hack (zomato, facebook) mein chori toh nahi hua.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.6,
-                color: isDark ? Colors.white54 : Colors.black54,
-              ),
-            ),
-          ).animate().fadeIn(delay: 150.ms),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScanning(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 120,
-            height: 120,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                SizedBox(
-                  width: 120, height: 120,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 4,
-                    color: const Color(0xFF7C4DFF),
-                    backgroundColor: const Color(0xFF7C4DFF).withValues(alpha: 0.15),
+              
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: Text(
+                    'Enter a valid email address.',
+                    style: TextStyle(
+                      color: isDark ? Colors.white54 : Colors.black54,
+                      fontSize: 12,
+                    ),
                   ),
-                ).animate(onPlay: (c) => c.repeat()).rotate(duration: 2.seconds),
-                const Icon(CupertinoIcons.shield_slash, color: Color(0xFF7C4DFF), size: 40)
-                    .animate(onPlay: (c) => c.repeat(reverse: true)).scale(begin: const Offset(0.8, 0.8), end: const Offset(1.1, 1.1)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          Text(
-            'Scanning Dark Web...',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: isDark ? Colors.white : const Color(0xFF0D1117),
-            ),
-          ).animate(onPlay: (c) => c.repeat(reverse: true)).fade(begin: 0.5, end: 1),
-          const SizedBox(height: 8),
-          Text(
-            'Searching billions of leaked records',
-            style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
+                ),
+              ),
 
-  Widget _buildError(bool isDark) {
-    return Center(
-      child: Text('An error occurred. Please check your internet connection.', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+              const SizedBox(height: 32),
+
+              // Scan Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _phase == _Phase.scanning ? null : _startScan,
+                  icon: _phase == _Phase.scanning 
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(CupertinoIcons.search, color: Colors.white70),
+                  label: Text(
+                    _phase == _Phase.scanning ? 'Scanning...' : 'Check Email',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E293B),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade800,
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                ),
+              ).animate().fadeIn(delay: 150.ms),
+
+              if (_phase == _Phase.error)
+                const Padding(
+                  padding: EdgeInsets.only(top: 40),
+                  child: Center(
+                    child: Text(
+                      'Network error. Please check your internet connection.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+
+              if (_phase == _Phase.done)
+                Padding(
+                  padding: const EdgeInsets.only(top: 32),
+                  child: _buildResults(isDark),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -290,66 +292,9 @@ class _EmailBreachScreenState extends State<EmailBreachScreen> {
       );
     }
 
-    return ListView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // AI Verdict Card
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFF7C4DFF).withValues(alpha: 0.4)),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF7C4DFF).withValues(alpha: 0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF7C4DFF).withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(CupertinoIcons.sparkles, color: Color(0xFFA370F7), size: 18),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text(
-                    'AI Security Analyst',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _verdict.isEmpty
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xFFA370F7)))
-                  : Text(
-                      _verdict,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        height: 1.6,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ).animate().fadeIn(),
-            ],
-          ),
-        ).animate().slideY(begin: 0.1).fadeIn(),
-        const SizedBox(height: 30),
-
         // Breaches List
         Text(
           'FOUND IN ${_breaches.length} BREACHES',

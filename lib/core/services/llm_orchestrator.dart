@@ -36,15 +36,15 @@ class LlmOrchestrator {
       return ruleVerdict;
     }
 
-    // Try cloud providers in order: Grok (primary) → Gemini (secondary)
+    // Try cloud providers in order: OpenRouter Claude (primary) → DeepSeek (secondary)
     final providers = [
       _Provider(
-        name: 'grok',
-        analyze: (t, l) => _callGrok(t, l),
+        name: 'openrouter',
+        analyze: (t, l) => _callOpenRouter(t, l),
       ),
       _Provider(
-        name: 'gemini',
-        analyze: (t, l) => _callGemini(t, l),
+        name: 'deepseek',
+        analyze: (t, l) => _callDeepSeek(t, l),
       ),
     ];
 
@@ -70,14 +70,14 @@ class LlmOrchestrator {
     return ruleVerdict.copyWith(isOffline: true);
   }
 
-  // ─── Gemini provider ───────────────────────────────────────────────────────
-  Future<AiVerdict> _callGemini(String text, String language) async {
+  // ─── OpenRouter provider (Claude Haiku) ───────────────────────────────────
+  Future<AiVerdict> _callOpenRouter(String text, String language) async {
     final langName = language == 'hi'
         ? 'Hindi (Devanagari or Hinglish acceptable)'
         : 'English';
 
-    const prompt = '''
-You are SafeSignal — India's top AI cybersecurity expert. Analyze the following message/content for scams and fraud.
+    final systemPrompt = '''
+You are SafeSignal — India's elite AI cybersecurity expert. Analyze the following content for scams, fraud, and security threats.
 
 RESPOND ONLY WITH A VALID JSON OBJECT — no markdown, no code blocks:
 {
@@ -85,103 +85,98 @@ RESPOND ONLY WITH A VALID JSON OBJECT — no markdown, no code blocks:
   "riskScore": 0 to 100,
   "confidence": 0.0 to 1.0,
   "reasons": ["specific red flag 1", "specific red flag 2", "specific red flag 3"],
-  "whatToDo": ["clear step 1", "clear step 2"],
-  "summary": "2 sentence summary in plain language"
+  "whatToDo": ["clear step 1", "clear step 2", "report to 1930 or cybercrime.gov.in"],
+  "summary": "2-3 sentence plain language summary"
 }
+Write ALL text in $langName.
 ''';
 
-    final systemPrompt = '$prompt\nWrite ALL text in $langName.\nAnalyze: ';
-
     final response = await _dio.post(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-      queryParameters: {'key': AppConstants.meshApiKey},
-      data: {
-        'contents': [
-          {
-            'parts': [
-              {'text': systemPrompt + text}
-            ]
-          }
-        ],
-        'generationConfig': {
-          'temperature': 0.1,
-          'maxOutputTokens': 800,
-        }
-      },
+      'https://openrouter.ai/api/v1/chat/completions',
       options: Options(
-        headers: {'Content-Type': 'application/json'},
-        sendTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${AppConstants.openRouterApiKey}',
+          'HTTP-Referer': 'https://safesignal.app',
+        },
+        sendTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
       ),
+      data: {
+        'model': 'anthropic/claude-3-haiku',
+        'messages': [
+          {'role': 'system', 'content': systemPrompt},
+          {'role': 'user', 'content': 'Analyze this content:\n$text'},
+        ],
+        'temperature': 0.1,
+        'response_format': {'type': 'json_object'},
+      },
     );
 
-    final content = response.data['candidates'][0]['content']['parts'][0]['text'] as String;
-
-    // Clean response — remove markdown if any
+    final content = response.data['choices'][0]['message']['content'] as String;
     String jsonStr = content.trim();
     if (jsonStr.startsWith('```')) {
       jsonStr = jsonStr.replaceAll(RegExp(r'```[a-z]*\n?'), '').trim();
     }
+    if (jsonStr.endsWith('```')) {
+      jsonStr = jsonStr.substring(0, jsonStr.length - 3).trim();
+    }
 
     final json = jsonDecode(jsonStr) as Map<String, dynamic>;
-    return AiVerdict.fromJson({...json, 'provider': 'gemini'});
+    return AiVerdict.fromJson({...json, 'provider': 'openrouter'});
   }
 
-  // ─── Grok provider ─────────────────────────────────────────────────────────
-  Future<AiVerdict> _callGrok(String text, String language) async {
+  // ─── DeepSeek provider (failover) ─────────────────────────────────────────
+  Future<AiVerdict> _callDeepSeek(String text, String language) async {
     final langName = language == 'hi'
         ? 'Hindi (Devanagari or Hinglish acceptable)'
         : 'English';
 
-    const prompt = '''
-You are SafeSignal — India's top AI cybersecurity expert. Analyze the following message/content for scams and fraud.
-
-RESPOND ONLY WITH A VALID JSON OBJECT — no markdown, no code blocks:
+    final systemPrompt = '''
+You are SafeSignal — India's elite AI cybersecurity expert. Analyze the following for scams and fraud.
+RESPOND ONLY WITH A VALID JSON OBJECT:
 {
   "verdict": "SCAM" or "SUSPICIOUS" or "SAFE",
   "riskScore": 0 to 100,
   "confidence": 0.0 to 1.0,
-  "reasons": ["specific red flag 1", "specific red flag 2", "specific red flag 3"],
-  "whatToDo": ["clear step 1", "clear step 2"],
-  "summary": "2 sentence summary in plain language"
+  "reasons": ["red flag 1", "red flag 2"],
+  "whatToDo": ["step 1", "step 2"],
+  "summary": "2 sentence summary"
 }
+Write ALL text in $langName.
 ''';
 
     final response = await _dio.post(
-      'https://api.x.ai/v1/chat/completions',
+      'https://api.deepseek.com/v1/chat/completions',
       options: Options(
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${AppConstants.grokApiKey}',
+          'Authorization': 'Bearer ${AppConstants.deepSeekApiKey}',
         },
-        sendTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
+        sendTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
       ),
       data: {
-        'model': 'grok-beta',
+        'model': 'deepseek-chat',
         'messages': [
-          {'role': 'system', 'content': '$prompt\nWrite ALL text in $langName.'},
-          {'role': 'user', 'content': 'Analyze this:\n$text'}
+          {'role': 'system', 'content': systemPrompt},
+          {'role': 'user', 'content': 'Analyze this content:\n$text'},
         ],
         'temperature': 0.1,
       },
     );
 
     final content = response.data['choices'][0]['message']['content'] as String;
-
-    // Clean response
     String jsonStr = content.trim();
     if (jsonStr.startsWith('```')) {
       jsonStr = jsonStr.replaceAll(RegExp(r'```[a-z]*\n?'), '').trim();
     }
-    
-    // Remove trailing ``` if present
     if (jsonStr.endsWith('```')) {
       jsonStr = jsonStr.substring(0, jsonStr.length - 3).trim();
     }
 
     final json = jsonDecode(jsonStr) as Map<String, dynamic>;
-    return AiVerdict.fromJson({...json, 'provider': 'grok'});
+    return AiVerdict.fromJson({...json, 'provider': 'deepseek'});
   }
 
   // ─── Circuit breaker logic ─────────────────────────────────────────────────

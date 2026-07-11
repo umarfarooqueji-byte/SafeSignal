@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:network_info_plus/network_info_plus.dart';
@@ -281,33 +282,43 @@ class _WifiScannerScreenState extends State<WifiScannerScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF06090F) : Colors.white;
-
     return Scaffold(
-      backgroundColor: bg,
+      extendBodyBehindAppBar: true,
+      backgroundColor: const Color(0xFFE3F2FD),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new,
-              color: isDark ? Colors.white : const Color(0xFF0D1117), size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0D1117), size: 22),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          'Wi Fi',
+        title: const Text(
+          'Network Scanner',
           style: TextStyle(
             fontWeight: FontWeight.w900,
-            fontSize: 24,
-            color: isDark ? Colors.white : const Color(0xFF0D1117),
+            fontSize: 22,
+            color: Color(0xFF0D1117),
+            letterSpacing: -0.5,
           ),
         ),
         centerTitle: true,
       ),
-      body: _phase == _Phase.idle
-          ? _buildIdle(isDark)
-          : _phase == _Phase.scanning
-              ? _buildScanning(isDark)
-              : _buildResult(isDark),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFE3F2FD), Color(0xFFBBDEFB), Color(0xFF90CAF9)],
+          ),
+        ),
+        child: SafeArea(
+          child: _phase == _Phase.idle
+              ? _buildIdle(isDark)
+              : _phase == _Phase.scanning
+                  ? _buildScanning(isDark)
+                  : _buildResult(isDark),
+        ),
+      ),
     );
   }
 
@@ -320,10 +331,10 @@ class _WifiScannerScreenState extends State<WifiScannerScreen> {
             width: 110,
             height: 110,
             decoration: BoxDecoration(
-              color: const Color(0xFFFFB300).withValues(alpha: 0.1),
+              color: AppTheme.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.wifi_find, size: 56, color: Color(0xFFFFB300)),
+            child: const Icon(Icons.wifi_find, size: 56, color: AppTheme.primary),
           ).animate().scale(begin: const Offset(0.7, 0.7)).fadeIn(),
           const SizedBox(height: 28),
           Text(
@@ -331,7 +342,7 @@ class _WifiScannerScreenState extends State<WifiScannerScreen> {
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w900,
-              color: isDark ? Colors.white : const Color(0xFF0D1117),
+              color: Color(0xFF1565C0),
             ),
           ).animate().fadeIn(delay: 100.ms),
           const SizedBox(height: 10),
@@ -355,8 +366,8 @@ class _WifiScannerScreenState extends State<WifiScannerScreen> {
               icon: const Icon(Icons.radar, size: 22),
               label: const Text('WiFi Scan Karo'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFB300),
-                foregroundColor: Colors.black,
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(56),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
@@ -377,14 +388,25 @@ class _WifiScannerScreenState extends State<WifiScannerScreen> {
           SizedBox(
             width: 120,
             height: 120,
-            child: CircularProgressIndicator(
-              strokeWidth: 6,
-              color: const Color(0xFFFFB300),
-              backgroundColor: const Color(0xFFFFB300).withValues(alpha: 0.15),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 120,
+                  height: 120,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 6,
+                    color: AppTheme.primary,
+                    backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
+                  ),
+                )
+                    .animate(onPlay: (c) => c.repeat())
+                    .rotate(duration: 1200.ms),
+                Image.asset('assets/images/logo_transparent.png', width: 48, height: 48)
+                    .animate(onPlay: (c) => c.repeat(reverse: true)).scale(begin: const Offset(0.9, 0.9), end: const Offset(1.1, 1.1)),
+              ],
             ),
-          )
-              .animate(onPlay: (c) => c.repeat())
-              .rotate(duration: 1200.ms),
+          ),
           const SizedBox(height: 28),
           Text(
             'Network scan ho raha hai...',
@@ -431,8 +453,8 @@ class _WifiScannerScreenState extends State<WifiScannerScreen> {
             ElevatedButton(
               onPressed: _scan,
               style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFB300),
-                  foregroundColor: Colors.black),
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white),
               child: const Text('Dobara Try Karo'),
             ),
           ],

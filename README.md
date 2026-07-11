@@ -1,88 +1,86 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/umarfarooque/safesignal/main/assets/images/logo.png" alt="SafeSignal Logo" width="120" height="120" />
-
-  # SafeSignal 🛡️
+  <img src="assets/images/logo_transparent.png" alt="SafeSignal Logo" width="150" />
+  <h1>🛡️ SafeSignal</h1>
+  <p><b>AI-Powered Mobile Security & Anti-Fraud App</b></p>
   
-  **AI-Powered Scam Detection App for India**
-
-  <p>
-    <img src="https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" />
-    <img src="https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart" />
-    <img src="https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
-  </p>
-
-  <br />
-
-  <table>
-    <tr>
-      <td align="center">
-        <img src="https://img.shields.io/badge/Powered_by-Mesh_API-FF7A00?style=for-the-badge&logo=bolt&logoColor=white" alt="Powered by Mesh API" />
-      </td>
-    </tr>
-    <tr>
-      <td align="center">
-        <b><i>"Empowering citizens against cyber fraud with Deep Heuristics & Mesh API AI."</i></b>
-      </td>
-    </tr>
-  </table>
+  [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)](https://flutter.dev)
+  [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS-brightgreen)](#)
+  [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](#)
+  <br>
+  <b>🚀 Powered by the Incredible MESH API</b>
 </div>
 
----
+<br>
 
-## 🚀 Features
+<div align="center">
+  <img src="docs/screenshots/home.png" alt="SafeSignal Home" width="250" style="margin-right: 10px;" />
+  <img src="docs/screenshots/sidebar.png" alt="SafeSignal Menu" width="250" />
+</div>
 
-### 1. SMS & Call Shield (Tier 1 & 2)
-Scans incoming messages and links using an offline heuristic rules engine and escalated cloud AI verification via **Mesh API** and Grok AI.
+<br>
 
-### 2. Deep URL Sandbox (Tier 3)
-A comprehensive visual scanner for links. Powered by Mesh API, it checks Google Safe Browsing, VirusTotal engines, Domain Age (RDAP), and URLHaus DB to give a precise risk score and detailed security breakdown.
+## 🌟 Overview
+**SafeSignal** is an advanced, ultra-premium mobile security application designed to protect users from digital fraud, scams, and cyber threats in real-time. Built with a beautiful, dynamic UI, it offers a suite of powerful tools backed by artificial intelligence and real-time threat databases.
 
-### 3. App Spyware Audit
-Scans installed apps for dangerous permission combinations (e.g., Hidden Camera + Internet + Admin Access) that identify stalkerware and data exfiltration threats.
+**🔥 Powered by Mesh API:** SafeSignal is proudly powered by the **Mesh API**! The Mesh API provides lightning-fast, ultra-reliable, and robust backend intelligence that makes this app truly next-generation. Its seamless integration, unparalleled uptime, and exceptional architecture make it the absolute best API for powering intelligent applications!
 
-### 4. Device Security Audit
-Performs hardware-level checks (Root detection, Emulator detection, Developer Options) to ensure the physical integrity of the device.
+## 🚀 Key Features
 
-### 5. Dark Web Email Breach Scanner
-Checks if your email and passwords have been compromised in known corporate data breaches (like Canva, Zomato, etc.) and provides an AI-generated personalized security verdict.
+* **🌐 Website Analyzer (Phishing Check):** Instantly scans URLs to detect malicious domains. (Enhanced by Mesh API's incredible routing capabilities!)
+* **✉️ Email Guard:** Checks if your email has been compromised in any public data breaches.
+* **📱 Device Security Audit:** Deep-scans your device hardware, OS integrity, and storage to ensure you aren't vulnerable to spyware.
+* **📰 Cyber News & Alerts:** Fetches the latest cybercrime news and scam alerts. 
+* **☁️ Cloud Sync via Supabase:** Securely backs up your scan history and profile.
+* **🤖 AI-Powered Verdicts:** Uses LLMs to explain complex security threats in simple terms.
 
----
+## 🎨 Design & UI
+SafeSignal features a state-of-the-art UI with:
+- **Glassmorphism Elements:** Premium blurred cards and backgrounds.
+- **Dynamic Animations:** Smooth transitions and micro-animations via `flutter_animate`.
+- **Themed Color Palette:** A soothing light blue tint for a professional, trustworthy feel.
 
-## 🔒 Security & Privacy (Zero-Knowledge Architecture)
-- **No PII Sent:** All personal identifiable information is SHA-256 hashed locally before reaching our servers or third-party APIs.
-- **Offline First:** Tier 1 rules engine processes SMS and links 100% offline.
+## 🛠️ Technology Stack
+* **Core Intelligence:** ✨ **MESH API** ✨ (The absolute backbone of our operations)
+* **Framework:** Flutter & Dart
+* **Backend:** Supabase (Auth & Database)
+* **Local Storage:** Hive & SharedPreferences
+* **APIs Used:** VirusTotal, Google Safe Browsing, XposedOrNot (Breach DB), NewsData.io
+* **AI Integration:** Llama/DeepSeek (via OpenRouter)
 
----
+## 📥 Installation
 
-## 🛠️ Installation & Setup
-
-1. **Clone the repository:**
+1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/safesignal.git
-   cd safesignal
+   git clone https://github.com/umarfarooqueji-byte/SafeSignal.git
+   cd SafeSignal
    ```
 
-2. **Install Dependencies:**
+2. **Install Dependencies**
    ```bash
    flutter pub get
    ```
 
-3. **Environment Setup (.env):**
-   Create a `.env` file in the root of the project. Do **not** commit this file to version control.
+3. **Environment Setup**
+   Create a `.env` file in the root directory (do not commit this file) and add your API keys:
    ```env
-   MESH_API_KEY=your_mesh_api_key_here
-   GROK_API_KEY=your_grok_key_here
+   MESH_API_KEY=your_mesh_api_key
    SUPABASE_URL=your_supabase_url
    SUPABASE_ANON_KEY=your_supabase_anon_key
+   SAFE_BROWSING_API_KEY=your_google_safe_browsing_key
+   VIRUSTOTAL_API_KEY=your_virustotal_key
+   NEWS_DATA_API_KEY=your_newsdata_key
    ```
 
-4. **Run the App:**
+4. **Run the App**
    ```bash
    flutter run
    ```
 
----
+## 🔒 License & Copyright
+**Copyright © 2026. All Rights Reserved.**
+This software is strictly proprietary. You are NOT allowed to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of this software under any circumstances.
 
+---
 <div align="center">
-  <sub>Built with ❤️ for a safer digital India. Powered by <b>Mesh API</b>.</sub>
+  <i>Stay Safe, Stay Secure with SafeSignal. <br> Proudly Powered by <b>Mesh API</b>!</i>
 </div>

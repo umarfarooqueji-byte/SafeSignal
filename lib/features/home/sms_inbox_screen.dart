@@ -99,30 +99,30 @@ class _SmsInboxScreenState extends State<SmsInboxScreen>
     final bg = isDark ? const Color(0xFF060A12) : Colors.white;
 
     return Scaffold(
-      backgroundColor: bg,
+      extendBodyBehindAppBar: true,
+      backgroundColor: const Color(0xFFE3F2FD),
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new,
-              color: isDark ? Colors.white : const Color(0xFF0D1117), size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0D1117), size: 22),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
+        title: const Text(
           'SMS Inbox',
           style: TextStyle(
             fontWeight: FontWeight.w900,
             fontSize: 22,
-            color: isDark ? Colors.white : const Color(0xFF0D1117),
+            color: Color(0xFF0D1117),
+            letterSpacing: -0.5,
           ),
         ),
         centerTitle: false,
         actions: [
           if (_allSms.isNotEmpty)
             IconButton(
-              icon: Icon(Icons.delete_outline,
-                  color: isDark ? Colors.white54 : Colors.black38),
+              icon: const Icon(Icons.delete_outline, color: Color(0xFF0D1117)),
               onPressed: _clearAll,
               tooltip: 'Clear All',
             ),
@@ -130,9 +130,9 @@ class _SmsInboxScreenState extends State<SmsInboxScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: const Color(0xFF2979FF),
-          unselectedLabelColor: isDark ? Colors.white38 : Colors.black38,
-          indicatorColor: const Color(0xFF2979FF),
+          labelColor: const Color(0xFF0D1117),
+          unselectedLabelColor: const Color(0xFF0D1117).withValues(alpha: 0.5),
+          indicatorColor: const Color(0xFF0D1117),
           indicatorWeight: 2.5,
           labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
           tabs: [
@@ -151,19 +151,49 @@ class _SmsInboxScreenState extends State<SmsInboxScreen>
           ],
         ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _filtered.isEmpty
-              ? _buildEmpty(isDark)
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                  itemCount: _filtered.length,
-                  itemBuilder: (context, i) => _SmsCard(
-                    sms: _filtered[i],
-                    isDark: isDark,
-                    index: i,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFE3F2FD), Color(0xFFBBDEFB), Color(0xFF90CAF9)],
+          ),
+        ),
+        child: SafeArea(
+          child: _loading
+              ? Center(
+                  child: SizedBox(
+                    width: 80,
+                    height: 80,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        const SizedBox(
+                          width: 80, height: 80,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 4,
+                            color: Color(0xFF2979FF),
+                          ),
+                        ),
+                        Image.asset('assets/images/logo_transparent.png', width: 40, height: 40)
+                            .animate(onPlay: (c) => c.repeat(reverse: true)).scale(begin: const Offset(0.9, 0.9), end: const Offset(1.1, 1.1)),
+                      ],
+                    ),
                   ),
-                ),
+                )
+              : _filtered.isEmpty
+                  ? _buildEmpty(isDark)
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                      itemCount: _filtered.length,
+                      itemBuilder: (context, i) => _SmsCard(
+                        sms: _filtered[i],
+                        isDark: isDark,
+                        index: i,
+                      ),
+                    ),
+        ),
+      ),
     );
   }
 

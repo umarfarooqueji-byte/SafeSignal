@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:safe_device/safe_device.dart';
 import 'dart:io';
+import '../../core/services/supabase_service.dart';
 
 import '../../core/widgets/arc_gauge.dart';
 
@@ -123,271 +124,227 @@ class _DeviceAuditScreenState extends State<DeviceAuditScreen> {
         checks: checks,
       );
     });
+
+    // Save to Supabase
+    try {
+      await SupabaseService().saveScanHistory(
+        scanType: 'DEVICE',
+        target: 'Local Device',
+        status: score >= 80 ? 'SAFE' : (score >= 50 ? 'WARNING' : 'DANGER'),
+        details: {
+          'score': score,
+          'failed_checks': checks.where((c) => c.level != _Level.safe).map((c) => c.label).toList(),
+        },
+      );
+    } catch (e) {
+      debugPrint('Supabase save error: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF06090F) : Colors.white;
+    final bg = isDark ? const Color(0xFF06090F) : const Color(0xFFEBF3FA); // Light blue tint matching app theme
+    final textColor = isDark ? Colors.white : const Color(0xFF1E293B);
+
+    double gaugeScore = 0;
+    String statusText = '';
+    Color statusColor = Colors.transparent;
+
+    if (_phase == _Phase.done && _result != null) {
+      gaugeScore = _result!.rating;
+      if (_result!.score >= 80) {
+        statusText = 'Secure';
+        statusColor = const Color(0xFF10B981);
+      } else if (_result!.score >= 50) {
+        statusText = 'Warning';
+        statusColor = const Color(0xFFFFB300);
+      } else {
+        statusText = 'Compromised';
+        statusColor = const Color(0xFFE53935);
+      }
+    } else if (_phase == _Phase.scanning) {
+      statusText = 'Scanning...';
+      statusColor = const Color(0xFF7C4DFF);
+    } else {
+      statusText = 'Ready to Scan';
+      statusColor = isDark ? Colors.white70 : Colors.black54;
+    }
 
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new,
-              color: isDark ? Colors.white : const Color(0xFF0D1117), size: 20),
+          icon: Icon(Icons.arrow_back_ios_new, color: textColor, size: 22),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Device Audit',
+          'Device Security',
           style: TextStyle(
             fontWeight: FontWeight.w900,
-            fontSize: 24,
-            color: isDark ? Colors.white : const Color(0xFF0D1117),
+            fontSize: 22,
+            color: textColor,
+            letterSpacing: -0.5,
           ),
         ),
         centerTitle: true,
       ),
-      body: _phase == _Phase.idle
-          ? _buildIdle(isDark)
-          : _phase == _Phase.scanning
-              ? _buildScanning(isDark)
-              : _buildResult(isDark),
-    );
-  }
-
-  Widget _buildIdle(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 110,
-            height: 110,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF44336).withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.phonelink_lock, size: 56, color: Color(0xFFF44336)),
-          ).animate().scale(begin: const Offset(0.7, 0.7)).fadeIn(),
-          const SizedBox(height: 28),
-          Text(
-            'Hardware & OS Audit',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-              color: isDark ? Colors.white : const Color(0xFF0D1117),
-            ),
-          ).animate().fadeIn(delay: 100.ms),
-          const SizedBox(height: 10),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Text(
-              'Aapke phone ke OS mein koi hidden hacker backdoor, root, ya dangerous settings toh on nahi hain? Deep scan karein.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.6,
-                color: isDark ? Colors.white54 : Colors.black54,
-              ),
-            ),
-          ).animate().fadeIn(delay: 150.ms),
-          const SizedBox(height: 36),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: ElevatedButton.icon(
-              onPressed: _startAudit,
-              icon: const Icon(Icons.search, size: 22),
-              label: const Text('Start Deep Audit'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF44336),
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(56),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-                elevation: 0,
-              ),
-            ),
-          ).animate().fadeIn(delay: 220.ms),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScanning(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 120,
-            height: 120,
-            child: CircularProgressIndicator(
-              strokeWidth: 6,
-              color: const Color(0xFFF44336),
-              backgroundColor: const Color(0xFFF44336).withValues(alpha: 0.15),
-            ),
-          )
-              .animate(onPlay: (c) => c.repeat())
-              .rotate(duration: 1200.ms),
-          const SizedBox(height: 28),
-          Text(
-            'Scanning System Core...',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: isDark ? Colors.white : const Color(0xFF0D1117),
-            ),
-          ).animate(onPlay: (c) => c.repeat(reverse: true)).fade(begin: 0.5, end: 1),
-          const SizedBox(height: 8),
-          Text(
-            'Checking root, ADB, and emulator hooks',
-            style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildResult(bool isDark) {
-    final r = _result!;
-    final gaugeColor = r.score >= 80
-        ? const Color(0xFF4CAF50)
-        : r.score >= 50
-            ? const Color(0xFFFFB300)
-            : const Color(0xFFE53935);
-
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(22, 0, 22, 32),
-      child: Column(
-        children: [
-          // Gauge
-          SizedBox(
-            width: 240,
-            height: 200,
-            child: ArcGauge(
-              value: r.rating,
-              maxValue: 5.0,
-              color: gaugeColor,
-              trackColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE0E0E0),
-              strokeWidth: 18,
-              sweepDegrees: 210,
-              centerChild: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 20),
-                  RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: r.rating.toStringAsFixed(0),
-                          style: TextStyle(
-                            fontSize: 56,
-                            fontWeight: FontWeight.w900,
-                            color: gaugeColor,
-                            height: 1,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(height: 24),
+              // Gauge
+              SizedBox(
+                width: 240,
+                height: 200,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: gaugeScore),
+                  duration: const Duration(milliseconds: 1000),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, child) {
+                    return ArcGauge(
+                      value: value,
+                      maxValue: 5.0,
+                      color: _phase == _Phase.scanning ? const Color(0xFF7C4DFF) : (statusColor == Colors.transparent ? Colors.grey : statusColor),
+                      trackColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE0E0E0),
+                      strokeWidth: 18,
+                      sweepDegrees: 210,
+                      centerChild: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 20),
+                          Icon(
+                            _phase == _Phase.done ? Icons.security : Icons.phonelink_lock,
+                            size: 48,
+                            color: _phase == _Phase.scanning ? const Color(0xFF7C4DFF) : (statusColor == Colors.transparent ? Colors.grey : statusColor),
                           ),
-                        ),
-                        TextSpan(
-                          text: '.${((r.rating * 10) % 10).round()}',
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w700,
-                            color: gaugeColor.withValues(alpha: 0.7),
-                            height: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '5',
-                    style: TextStyle(
-                      color: isDark ? Colors.white38 : Colors.black38,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          Text(
-            r.score >= 80 ? 'DEVICE IS SECURE' : 'ACTION REQUIRED',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-              color: isDark ? Colors.white : const Color(0xFF0D1117),
-            ),
-          ).animate().fadeIn(),
-          const SizedBox(height: 20),
-
-          // Security checks
-          ...r.checks.asMap().entries.map((e) {
-            final c = e.value;
-            final color = c.level == _Level.safe
-                ? const Color(0xFF4CAF50)
-                : c.level == _Level.warning
-                    ? const Color(0xFFFFB300)
-                    : c.level == _Level.danger
-                        ? const Color(0xFFE53935)
-                        : const Color(0xFFB71C1C);
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF161B27) : Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8EEF8),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(c.icon, color: color, size: 20),
+              const SizedBox(height: 16),
+              // Status Text
+              Text(
+                statusText,
+                style: TextStyle(
+                  color: statusColor,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                ),
+              ).animate(key: ValueKey(_phase)).fadeIn(),
+              
+              const SizedBox(height: 48),
+
+              // Scan Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _phase == _Phase.scanning ? null : _startAudit,
+                  icon: _phase == _Phase.scanning 
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.search, color: Colors.white70),
+                  label: Text(
+                    _phase == _Phase.scanning ? 'Scanning...' : 'Scan Device',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E293B),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade800,
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                ),
+              ).animate().fadeIn(delay: 150.ms),
+
+              if (_phase == _Phase.done && _result != null) ...[
+                const SizedBox(height: 40),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Security Checks',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: textColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ..._result!.checks.asMap().entries.map((e) {
+                  final c = e.value;
+                  final color = c.level == _Level.safe
+                      ? const Color(0xFF4CAF50)
+                      : c.level == _Level.warning
+                          ? const Color(0xFFFFB300)
+                          : c.level == _Level.danger
+                              ? const Color(0xFFE53935)
+                              : const Color(0xFFB71C1C);
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF161B27) : Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8EEF8),
+                      ),
+                    ),
+                    child: Row(
                       children: [
-                        Text(
-                          c.label,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
-                            color: isDark ? Colors.white : const Color(0xFF0D1117),
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
                           ),
+                          child: Icon(c.icon, color: color, size: 20),
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          c.detail,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? Colors.white54 : Colors.black54,
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                c.label,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                  color: isDark ? Colors.white : const Color(0xFF0D1117),
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                c.detail,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? Colors.white54 : Colors.black54,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-            ).animate().fadeIn(delay: Duration(milliseconds: 200 + e.key * 70));
-          }),
-        ],
+                  ).animate().fadeIn(delay: Duration(milliseconds: 200 + e.key * 70));
+                }),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

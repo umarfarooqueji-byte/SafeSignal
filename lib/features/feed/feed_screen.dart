@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:dio/dio.dart';
@@ -16,16 +17,12 @@ class FeedScreen extends StatefulWidget {
 class _FeedScreenState extends State<FeedScreen> {
   List<AlertModel> _alerts = [];
   bool _loading = true;
-  String _selectedCategory = 'all';
+  String _selectedCategory = 'hi';
   String? _errorMessage;
 
   final _categories = [
-    ('all', 'Sab', '📋'),
-    ('digital_arrest', 'Arrest Scam', '👮'),
-    ('otp', 'OTP Fraud', '🔐'),
-    ('investment', 'Investment', '💰'),
-    ('lottery', 'Lottery', '🎰'),
-    ('general', 'Other Alerts', '⚠️'),
+    ('hi', 'Hindi News'),
+    ('en', 'Hinglish News'),
   ];
 
   @override
@@ -48,7 +45,7 @@ class _FeedScreenState extends State<FeedScreen> {
           'apikey': AppConstants.newsDataApiKey,
           'q': 'scam OR fraud OR cybercrime OR cyber',
           'country': 'in',
-          'language': 'en,hi',
+          'language': _selectedCategory, // 'hi' or 'en'
         },
       );
 
@@ -72,9 +69,7 @@ class _FeedScreenState extends State<FeedScreen> {
     }
   }
 
-  List<AlertModel> get _filtered => _selectedCategory == 'all'
-      ? _alerts
-      : _alerts.where((a) => a.category == _selectedCategory).toList();
+  List<AlertModel> get _filtered => _alerts; // The API already filters by language.
 
   @override
   Widget build(BuildContext context) {
@@ -89,18 +84,14 @@ class _FeedScreenState extends State<FeedScreen> {
         elevation: 0,
         title: Row(
           children: [
-            Container(
+            Image.asset(
+              'assets/images/logo_transparent.png',
               width: 38,
               height: 38,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFFE53935), Color(0xFFFF8A80)]),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.campaign, color: Colors.white, size: 22),
             ),
             const SizedBox(width: 12),
             Text(
-              'Scam Alerts 🚨',
+              'Scam Alerts',
               style: TextStyle(
                 fontWeight: FontWeight.w900,
                 fontSize: 22,
@@ -130,7 +121,12 @@ class _FeedScreenState extends State<FeedScreen> {
                 final cat = _categories[i];
                 final isSelected = _selectedCategory == cat.$1;
                 return GestureDetector(
-                  onTap: () => setState(() => _selectedCategory = cat.$1),
+                  onTap: () {
+                    if (_selectedCategory != cat.$1) {
+                      setState(() => _selectedCategory = cat.$1);
+                      _fetchNews();
+                    }
+                  },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 220),
                     margin: const EdgeInsets.only(right: 8),
@@ -158,8 +154,6 @@ class _FeedScreenState extends State<FeedScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(cat.$3, style: const TextStyle(fontSize: 14)),
-                        const SizedBox(width: 6),
                         Text(
                           cat.$2,
                           style: TextStyle(
@@ -220,7 +214,7 @@ class _FeedScreenState extends State<FeedScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text('📭', style: TextStyle(fontSize: 48)),
+                                Icon(Icons.newspaper_rounded, size: 48, color: isDark ? Colors.white24 : Colors.black26),
                                 const SizedBox(height: 16),
                                 Text(
                                   'Is category mein koi alert nahi',
@@ -270,18 +264,22 @@ class _AlertCard extends StatelessWidget {
     }
   }
 
-  String get _categoryEmoji {
+  IconData get _categoryIcon {
     switch (alert.category) {
       case 'digital_arrest':
-        return '👮';
+        return Icons.local_police_rounded;
       case 'investment':
-        return '💰';
+        return Icons.monetization_on_rounded;
       case 'otp':
-        return '🔐';
-      case 'lottery':
-        return '🎰';
+        return Icons.password_rounded;
+      case 'loan':
+        return Icons.account_balance_rounded;
+      case 'job':
+        return Icons.work_rounded;
+      case 'phishing':
+        return Icons.phishing_rounded;
       default:
-        return '⚠️';
+        return Icons.warning_rounded;
     }
   }
 
@@ -368,7 +366,7 @@ class _AlertCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Text(_categoryEmoji, style: const TextStyle(fontSize: 16)),
+                Icon(_categoryIcon, size: 18, color: color),
                 const SizedBox(width: 8),
                 Text(
                   _categoryLabel.toUpperCase(),
@@ -396,6 +394,27 @@ class _AlertCard extends StatelessWidget {
             ),
           ),
 
+          ClipRRect(
+            child: alert.imageUrl != null 
+              ? Image.network(
+                  alert.imageUrl!,
+                  height: 160,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (ctx, err, stack) => Image.asset(
+                    'assets/images/news_fallback.png',
+                    height: 160,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                )
+              : Image.asset(
+                  'assets/images/news_fallback.png',
+                  height: 160,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+          ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -505,6 +524,7 @@ class _NewsDataParser {
       final link = item['link']?.toString();
       final pubDateStr = item['pubDate']?.toString();
       final source = item['source_id']?.toString() ?? 'News';
+      final imageUrl = item['image_url']?.toString() ?? 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=800&q=80';
 
       DateTime? publishedAt;
       if (pubDateStr != null) {

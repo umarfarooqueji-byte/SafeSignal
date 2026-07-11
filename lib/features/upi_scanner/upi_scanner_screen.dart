@@ -279,27 +279,32 @@ class _UpiScannerScreenState extends State<UpiScannerScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
+      backgroundColor: const Color(0xFFE3F2FD),
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(CupertinoIcons.back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0D1117), size: 22),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
           'UPI & QR Scanner',
           style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w800,
-            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            fontSize: 22,
+            color: Color(0xFF0D1117),
+            letterSpacing: -0.5,
           ),
         ),
+        centerTitle: true,
         actions: [
           if (_isScanning)
             IconButton(
               icon: Icon(
                 _torchOn ? CupertinoIcons.bolt_fill : CupertinoIcons.bolt,
-                color: _torchOn ? Colors.yellow : Colors.white,
+                color: _torchOn ? Colors.orange : const Color(0xFF0D1117),
               ),
               onPressed: () {
                 setState(() => _torchOn = !_torchOn);
@@ -309,11 +314,22 @@ class _UpiScannerScreenState extends State<UpiScannerScreen>
           const SizedBox(width: 8),
         ],
       ),
-      body: _scanResult != null
-          ? _buildResultView(_scanResult!)
-          : _isAnalyzing
-              ? _buildAnalyzingView()
-              : _buildScannerView(),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFE3F2FD), Color(0xFFBBDEFB), Color(0xFF90CAF9)],
+          ),
+        ),
+        child: SafeArea(
+          child: _scanResult != null
+              ? _buildResultView(_scanResult!)
+              : _isAnalyzing
+                  ? _buildAnalyzingView()
+                  : _buildScannerView(),
+        ),
+      ),
     );
   }
 
@@ -447,9 +463,19 @@ class _UpiScannerScreenState extends State<UpiScannerScreen>
               color: const Color(0xFF2979FF).withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
-            child: const CircularProgressIndicator(
-              color: Color(0xFF2979FF),
-              strokeWidth: 3,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                const SizedBox(
+                  width: 80, height: 80,
+                  child: CircularProgressIndicator(
+                    color: Color(0xFF2979FF),
+                    strokeWidth: 3,
+                  ),
+                ),
+                Image.asset('assets/images/logo_transparent.png', width: 40, height: 40)
+                    .animate(onPlay: (c) => c.repeat(reverse: true)).scale(begin: const Offset(0.9, 0.9), end: const Offset(1.1, 1.1)),
+              ],
             ),
           ).animate().scale(duration: 400.ms),
           const SizedBox(height: 24),
