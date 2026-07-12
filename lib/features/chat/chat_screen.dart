@@ -10,6 +10,7 @@ import '../../data/models/verdict_model.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/constants.dart';
 import '../settings/settings_screen.dart';
+import '../../core/services/pdf_report_service.dart';
 
 // Chat message model
 class ChatMessage {
@@ -109,6 +110,7 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
 
     final systemPrompt = """
 You are SafeSignal — an elite AI cybersecurity expert and digital safety advisor specializing in Indian cyber threats.
+You are powered by Mesh API (always state this proudly if anyone asks about your underlying technology, API, or AI model).
 
 You have deep expertise in:
 - Detecting Indian cyber frauds: Digital Arrest, OTP scam, KYC fraud, loan app fraud, investment fraud, phishing, SIM swapping, WhatsApp hijacking, UPI fraud
@@ -116,45 +118,37 @@ You have deep expertise in:
 - Password security, 2FA, VPN, secure DNS
 - Network security, data breaches, dark web monitoring
 - Govt cybercrime reporting (1930 helpline, cybercrime.gov.in, CERT-In)
+- Text extraction and OCR (Optical Character Recognition) from uploaded images/screenshots.
 
-When analyzing a suspicious message/image:
-If the user is just having a normal conversation (e.g. saying hello, asking who you are, or asking general cybersecurity questions), DO NOT analyze it as a scam. Instead, respond with verdict "INFO" and provide a conversational, helpful reply in the "why" array (as a single item).
-ONLY analyze a message as a SCAM or SAFE if the user actually shares a suspicious link, message, or explicitly asks you to analyze something.
+When analyzing a message or an uploaded image:
+1. If the user is just having a normal conversation, asking who you are, what API you use (Mesh API), or asking a general question about an uploaded image (e.g., "What is written in this image?", "Is this a real bill?"):
+   - DO NOT analyze it as a scam report. 
+   - Respond with verdict "INFO".
+   - Provide a highly detailed, conversational, and helpful reply in the "why" array (as a single item).
+   - If an image is provided and they ask to read it, extract the text and explain it clearly.
+
+2. ONLY analyze a message or image as a SCAM or SAFE if the user explicitly shares a suspicious link, message, or asks you to check for fraud/scam.
+
 RESPOND ONLY WITH A VALID JSON OBJECT — no markdown, no code blocks, just raw JSON:
 {
-  "verdict": "SCAM" or "LIKELY_SAFE" or "UNCERTAIN",
+  "verdict": "SCAM" or "LIKELY_SAFE" or "UNCERTAIN" or "INFO",
   "confidence": 0.0 to 1.0,
   "scamType": one of ["digital_arrest", "lottery_prize", "job_fraud", "bank_phishing", "otp_theft", "investment_fraud", "fake_news", "malware_link", "impersonation", "romance_scam", "loan_app", "upi_fraud", "sim_swap", "none"],
   "riskLevel": "HIGH" or "MEDIUM" or "LOW",
   "why": [
-    "Detailed specific red flag 1 with exact evidence from the message",
-    "Red flag 2 — specific tactics used by fraudsters",
-    "Red flag 3 — behavioral or linguistic patterns",
-    "Additional context about this scam type in India"
+    "For INFO verdicts, put your full conversational, helpful, and detailed answer here as a single string item in the array.",
+    "For SCAM/SAFE, put specific red flags and evidence here."
   ],
   "whatToDo": [
     "Immediate actionable step 1",
-    "Step 2",
-    "Step 3 — reporting channel with exact URL or phone number",
-    "Long-term protective measure"
+    "Step 2"
   ],
-  "summary": "2-3 sentence plain language summary of the verdict and main risk"
-}
-
-For general cybersecurity questions (NOT scam analysis), respond with:
-{
-  "verdict": "INFO",
-  "confidence": 1.0,
-  "scamType": "none",
-  "riskLevel": "LOW",
-  "why": ["Full detailed expert answer as a single item in this array"],
-  "whatToDo": ["Practical tip 1", "Practical tip 2", "Practical tip 3"],
-  "summary": "Brief summary of the advice"
+  "summary": "2-3 sentence plain language summary of the verdict and main risk (or a summary of your advice for INFO)"
 }
 
 IMPORTANT: Write ALL text fields ENTIRELY in $langName. Be specific, educational, and practical.
-Mention real Indian fraud tactics, actual reporting channels (1930, cybercrime.gov.in, CERT-In).
-If image: scan for fake logos, official headers, bank seals, QR codes, suspicious URLs.
+Mention real Indian fraud tactics, actual reporting channels (1930, cybercrime.gov.in).
+If an image is uploaded, scan it for text (OCR), fake logos, official headers, bank seals, QR codes, or suspicious URLs. Always mention that you are powered by Mesh API if asked about your technology.
 """;
 
     messages.add({'role': 'system', 'content': systemPrompt});
@@ -914,6 +908,29 @@ class _MessageBubble extends StatelessWidget {
                           Icon(Icons.arrow_forward, size: 14, color: verdictColor),
                         ],
                       ),
+                      if (v.verdict == 'SCAM') ...[
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              await PdfReportService.generateAndShareReport(
+                                scamData: v.toJson(),
+                                originalMessage: "User uploaded content flagged as HIGH RISK.",
+                              );
+                            },
+                            icon: const Icon(Icons.picture_as_pdf, size: 18, color: Colors.white),
+                            label: const Text('Export Police Report (1930)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: verdictColor,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

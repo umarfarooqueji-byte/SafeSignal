@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:dio/dio.dart';
@@ -524,7 +524,7 @@ class _NewsDataParser {
       final link = item['link']?.toString();
       final pubDateStr = item['pubDate']?.toString();
       final source = item['source_id']?.toString() ?? 'News';
-      final imageUrl = item['image_url']?.toString() ?? 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=800&q=80';
+
 
       DateTime? publishedAt;
       if (pubDateStr != null) {

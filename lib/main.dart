@@ -15,7 +15,13 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Load Environment Variables
-  await dotenv.load(fileName: ".env");
+  bool envLoaded = false;
+  try {
+    await dotenv.load(fileName: ".env");
+    envLoaded = true;
+  } catch (e) {
+    debugPrint('CRITICAL: .env file not found or failed to load. Check .env.example.');
+  }
 
   // Initialize Hive
   await Hive.initFlutter();
@@ -23,11 +29,19 @@ void main() async {
   Hive.registerAdapter(AlertModelAdapter());
   Hive.registerAdapter(CheckHistoryModelAdapter());
 
-  // Initialize Supabase
-  await Supabase.initialize(
-    url: AppConstants.supabaseUrl,
-    anonKey: AppConstants.supabaseAnonKey, // ignore: deprecated_member_use
-  );
+  // Initialize Supabase only if env is loaded and keys are present
+  if (envLoaded && AppConstants.supabaseUrl.isNotEmpty && AppConstants.supabaseAnonKey.isNotEmpty) {
+    try {
+      await Supabase.initialize(
+        url: AppConstants.supabaseUrl,
+        anonKey: AppConstants.supabaseAnonKey, // ignore: deprecated_member_use
+      );
+    } catch (e) {
+      debugPrint('CRITICAL: Failed to initialize Supabase: $e');
+    }
+  } else {
+    debugPrint('CRITICAL: Skipping Supabase initialization due to missing environment variables.');
+  }
 
   runApp(const ProviderScope(child: SafeSignalApp()));
 }

@@ -7,6 +7,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -260,23 +261,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               title: 'App Spyware\nAudit',
                               subtitle: 'Malware Check',
                               imagePath: 'assets/images/ai_spyware_card.png',
-                              height: 220,
+                              height: 155,
                               onTap: () => context.push('/app-scanner'),
-                            ),
+                            ).animate().scale(begin: const Offset(0.9, 0.9), delay: 50.ms).fadeIn(),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: _ImageCard(
                               title: 'WiFi Security\nScanner',
                               subtitle: 'Network Threat Alert',
                               imagePath: 'assets/images/ai_wifi_card.png',
-                              height: 220,
+                              height: 155,
                               onTap: () => context.push('/wifi-scanner'),
-                            ),
+                            ).animate().scale(begin: const Offset(0.9, 0.9), delay: 100.ms).fadeIn(),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -285,23 +286,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               title: 'Website\nAnalyzer',
                               subtitle: 'Phishing Check',
                               imagePath: 'assets/images/ai_website_card.png',
-                              height: 200,
+                              height: 145,
                               onTap: () => context.push('/url-scanner'),
-                            ),
+                            ).animate().scale(begin: const Offset(0.9, 0.9), delay: 150.ms).fadeIn(),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: _ImageCard(
                               title: 'Call Shield\nAnalysis',
                               subtitle: 'Spam Call Protection',
                               imagePath: 'assets/images/ai_call_shield_card.png',
-                              height: 200,
+                              height: 145,
                               onTap: () => context.push('/call-shield'),
-                            ),
+                            ).animate().scale(begin: const Offset(0.9, 0.9), delay: 200.ms).fadeIn(),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
@@ -309,23 +310,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               title: 'SMS Guard\n& OTP Protect',
                               subtitle: 'Financial Fraud Alert',
                               imagePath: 'assets/images/ai_sms_guard_card.png',
-                              height: 180,
+                              height: 135,
                               onTap: () => context.push('/sms-inbox'),
-                            ),
+                            ).animate().scale(begin: const Offset(0.9, 0.9), delay: 250.ms).fadeIn(),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: _ImageCard(
                               title: 'Dark Web\nBreach Scan',
                               subtitle: 'Identity Theft Check',
                               imagePath: 'assets/images/ai_darkweb_card.png',
-                              height: 180,
+                              height: 135,
                               onTap: () => context.push('/email-breach'),
-                            ),
+                            ).animate().scale(begin: const Offset(0.9, 0.9), delay: 300.ms).fadeIn(),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
@@ -333,12 +334,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               title: 'AI Cyber\nAssistant',
                               subtitle: 'Ask Any Threat',
                               imagePath: 'assets/images/ai_assistant_card.png',
-                              height: 180,
+                              height: 135,
                               onTap: () => context.push('/chat'),
-                            ),
+                            ).animate().scale(begin: const Offset(0.9, 0.9), delay: 350.ms).fadeIn(),
                           ),
-                          const SizedBox(width: 16),
-                          const Expanded(child: SizedBox()), 
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _ImageCard(
+                              title: 'AI Scanner\nAdvanced',
+                              subtitle: 'QR & Barcode',
+                              imagePath: 'assets/images/ai_website_card.png',
+                              height: 135,
+                              onTap: () => context.push('/qr-scanner'),
+                            ).animate().scale(begin: const Offset(0.9, 0.9), delay: 400.ms).fadeIn(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _ImageCard(
+                              title: 'Clipboard\nGuard',
+                              subtitle: 'OTP Protection',
+                              imagePath: 'assets/images/ai_sms_guard_card.png',
+                              height: 135,
+                              onTap: () => context.push('/clipboard'),
+                            ).animate().scale(begin: const Offset(0.9, 0.9), delay: 450.ms).fadeIn(),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _ImageCard(
+                              title: 'App Lock\nVault',
+                              subtitle: 'Biometric Security',
+                              imagePath: 'assets/images/ai_spyware_card.png',
+                              height: 135,
+                              onTap: () => context.push('/vault'),
+                            ).animate().scale(begin: const Offset(0.9, 0.9), delay: 500.ms).fadeIn(),
+                          ),
                         ],
                       ),
                     ],
@@ -531,10 +564,11 @@ class _ImageCard extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.transparent,
-                Colors.black.withOpacity(0.3),
+                Colors.black.withOpacity(0.2),
                 Colors.black.withOpacity(0.8),
+                Colors.black,
               ],
+              stops: const [0.0, 0.4, 1.0],
             ),
           ),
           padding: const EdgeInsets.all(20),

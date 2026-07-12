@@ -1,5 +1,17 @@
 package com.safesignal.safesignal
 
+import android.graphics.PixelFormat
+import android.os.Looper
+import android.os.Handler
+import android.view.Gravity
+import android.view.View
+import android.view.WindowManager
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.graphics.Color
+import android.provider.Settings
+
+
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -18,6 +30,8 @@ import java.util.regex.Pattern
 
 class SmsReceiver : BroadcastReceiver() {
     companion object {
+        private var overlayView: View? = null
+        private var windowManager: WindowManager? = null
         private const val CHANNEL_ID = "safesignal_sms_alerts"
         private const val NOTIFICATION_ID_BASE = 2002
         private const val PREFS_NAME = "FlutterSharedPreferences"
@@ -317,5 +331,157 @@ class SmsReceiver : BroadcastReceiver() {
             .build()
 
         nm.notify(NOTIFICATION_ID_BASE + sender.hashCode(), notification)
+    }
+
+    private fun showPremiumOverlay(context: Context, sender: String, analysis: SmsAnalysis) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
+            return
+        }
+
+        Handler(Looper.getMainLooper()).post {
+            try {
+                dismissOverlay()
+
+                val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                windowManager = wm
+
+                // Base Container
+                val container = LinearLayout(context).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(48, 48, 48, 48)
+                    
+                    val bgDrawable = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                        cornerRadius = 48f
+                        colors = intArrayOf(Color.parseColor("#1E2128"), Color.parseColor("#121418"))
+                        setStroke(2, Color.parseColor("#44FFFFFF"))
+                    }
+                    background = bgDrawable
+                    elevation = 30f
+                }
+
+                // Brand header
+                val brandRow = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                }
+                val brandIcon = TextView(context).apply {
+                    text = "🛡️"
+                    textSize = 18f
+                    setPadding(0, 0, 16, 0)
+                }
+                val brandText = TextView(context).apply {
+                    text = "SafeSignal AI Shield"
+                    setTextColor(Color.parseColor("#4CAF50"))
+                    textSize = 15f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                }
+                brandRow.addView(brandIcon)
+                brandRow.addView(brandText)
+
+                val divider = View(context).apply {
+                    val params = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2)
+                    params.setMargins(0, 24, 0, 24)
+                    layoutParams = params
+                    setBackgroundColor(Color.parseColor("#2A2E35"))
+                }
+
+                val incomingLabel = TextView(context).apply {
+                    text = "DANGEROUS SMS DETECTED"
+                    setTextColor(Color.parseColor("#FF5252"))
+                    textSize = 11f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    letterSpacing = 0.05f
+                }
+
+                val senderText = TextView(context).apply {
+                    text = sender
+                    setTextColor(Color.WHITE)
+                    textSize = 24f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setPadding(0, 8, 0, 0)
+                }
+
+                val badgeContainer = LinearLayout(context).apply {
+                    setPadding(0, 32, 0, 16)
+                    gravity = Gravity.LEFT
+                }
+                
+                val bgColor = if(analysis.verdict == "SCAM") Color.parseColor("#C62828") else Color.parseColor("#E65100")
+                val emoji = if(analysis.verdict == "SCAM") "🔴" else "⚠️"
+                
+                val verdictBadge = TextView(context).apply {
+                    text = "$emoji  ${analysis.verdict} (${analysis.confidence}%)"
+                    setTextColor(Color.WHITE)
+                    textSize = 15f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setPadding(40, 20, 40, 20)
+                    
+                    val badgeBg = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                        cornerRadius = 100f
+                        setColor(bgColor)
+                        setStroke(2, Color.parseColor("#50FFFFFF"))
+                    }
+                    background = badgeBg
+                }
+                badgeContainer.addView(verdictBadge)
+
+                val reasonText = TextView(context).apply {
+                    text = analysis.reason
+                    setTextColor(Color.parseColor("#CCD6F6"))
+                    textSize = 14f
+                    setPadding(0, 8, 0, 0)
+                    setLineSpacing(4f, 1f)
+                }
+
+                container.addView(brandRow)
+                container.addView(divider)
+                container.addView(incomingLabel)
+                container.addView(senderText)
+                container.addView(badgeContainer)
+                container.addView(reasonText)
+
+                val wrapper = LinearLayout(context).apply {
+                    setPadding(40, 80, 40, 40)
+                    addView(container, LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ))
+                }
+
+                val params = WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                    else
+                        @Suppress("DEPRECATION")
+                        WindowManager.LayoutParams.TYPE_PHONE,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                    PixelFormat.TRANSLUCENT
+                ).apply {
+                    gravity = Gravity.TOP
+                    y = 50
+                }
+
+                wm.addView(wrapper, params)
+                overlayView = wrapper
+
+                Handler(Looper.getMainLooper()).postDelayed({ dismissOverlay() }, 15000)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun dismissOverlay() {
+        try {
+            overlayView?.let { view ->
+                windowManager?.removeView(view)
+                overlayView = null
+            }
+        } catch (e: Exception) {}
     }
 }

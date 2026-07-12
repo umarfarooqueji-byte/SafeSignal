@@ -13,6 +13,7 @@ class CallShieldScreen extends StatefulWidget {
 
 class _CallShieldScreenState extends State<CallShieldScreen> {
   bool _isPhonePermissionGranted = false;
+  bool _isOverlayGranted = false;
 
   @override
   void initState() {
@@ -22,22 +23,26 @@ class _CallShieldScreenState extends State<CallShieldScreen> {
 
   Future<void> _checkPermission() async {
     final status = await Permission.phone.status;
+    final overlay = await Permission.systemAlertWindow.status;
     setState(() {
       _isPhonePermissionGranted = status.isGranted;
+      _isOverlayGranted = overlay.isGranted;
     });
   }
 
   Future<void> _requestPermission() async {
     final status = await Permission.phone.request();
+    final overlay = await Permission.systemAlertWindow.request();
     setState(() {
       _isPhonePermissionGranted = status.isGranted;
+      _isOverlayGranted = overlay.isGranted;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF060A12) : Colors.white;
+
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -115,18 +120,20 @@ class _CallShieldScreenState extends State<CallShieldScreen> {
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF0F1724) : const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: _isPhonePermissionGranted
-                        ? const Color(0xFF00C853).withValues(alpha: 0.3)
-                        : const Color(0xFFFFB300).withValues(alpha: 0.3),
-                    width: 1.5,
+                  border: Border(
+                    left: BorderSide(
+                      color: (_isPhonePermissionGranted && _isOverlayGranted)
+                          ? const Color(0xFF00C853)
+                          : const Color(0xFFFFB300),
+                      width: 4,
+                    ),
                   ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      _isPhonePermissionGranted ? Icons.check_circle : Icons.warning_amber_rounded,
-                      color: _isPhonePermissionGranted ? const Color(0xFF00C853) : const Color(0xFFFFB300),
+                      (_isPhonePermissionGranted && _isOverlayGranted) ? Icons.check_circle : Icons.warning_amber_rounded,
+                      color: (_isPhonePermissionGranted && _isOverlayGranted) ? const Color(0xFF00C853) : const Color(0xFFFFB300),
                       size: 28,
                     ),
                     const SizedBox(width: 16),
@@ -135,7 +142,7 @@ class _CallShieldScreenState extends State<CallShieldScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _isPhonePermissionGranted ? 'Active Call Shield' : 'Permission Required',
+                            (_isPhonePermissionGranted && _isOverlayGranted) ? 'Active Call Shield' : 'Permissions Required',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
@@ -144,9 +151,9 @@ class _CallShieldScreenState extends State<CallShieldScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            _isPhonePermissionGranted
+                            (_isPhonePermissionGranted && _isOverlayGranted)
                                 ? 'SafeSignal is monitoring calls in the background.'
-                                : 'Grant phone permissions to flag known spam callers.',
+                                : 'Grant Phone and Display Over Other Apps permissions.',
                             style: TextStyle(
                               fontSize: 12.5,
                               color: Colors.grey.shade500,
@@ -155,7 +162,7 @@ class _CallShieldScreenState extends State<CallShieldScreen> {
                         ],
                       ),
                     ),
-                    if (!_isPhonePermissionGranted)
+                    if (!(_isPhonePermissionGranted && _isOverlayGranted))
                       ElevatedButton(
                         onPressed: _requestPermission,
                         style: ElevatedButton.styleFrom(
@@ -163,7 +170,7 @@ class _CallShieldScreenState extends State<CallShieldScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
-                        child: const Text('Allow', style: TextStyle(fontSize: 13)),
+                        child: const Text('Fix', style: TextStyle(fontSize: 13)),
                       ),
                   ],
                 ),

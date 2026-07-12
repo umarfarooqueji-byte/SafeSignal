@@ -11,16 +11,28 @@ import android.provider.Settings
 import android.telephony.TelephonyManager
 import android.os.Bundle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private val CHANNEL = "com.safesignal/app_scanner"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        
+        // Start Persistent Background Service
+        try {
+            val serviceIntent = Intent(this, SafeSignalService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -33,6 +45,14 @@ class MainActivity : FlutterActivity() {
                         val pkg = call.argument<String>("package")
                         if (pkg != null) {
                             result.success(getAppIcon(pkg))
+                        } else {
+                            result.error("INVALID_ARGUMENT", "Package name is required", null)
+                        }
+                    }
+                    "getAppHash" -> {
+                        val pkg = call.argument<String>("package")
+                        if (pkg != null) {
+                            result.success(getAppHash(pkg))
                         } else {
                             result.error("INVALID_ARGUMENT", "Package name is required", null)
                         }
@@ -70,7 +90,7 @@ class MainActivity : FlutterActivity() {
     // ─── Installed Apps ──────────────────────────────────────────────────────
     private fun getInstalledApps(): List<Map<String, Any>> {
         val pm = packageManager
-        val installedApps = pm.getInstalledPackages(PackageManager.GET_PERMISSIONS)
+        val installedApps = pm.getInstalledPackages(PackageManager.GET_PERMISSIONS or PackageManager.GET_SERVICES or PackageManager.GET_RECEIVERS)
         val apps = mutableListOf<Map<String, Any>>()
 
         val systemSkip = setOf(
@@ -100,6 +120,9 @@ class MainActivity : FlutterActivity() {
                 pm.getInstallerPackageName(pkg.packageName)
             }
 
+            val hasAccessibility = pkg.services?.any { it.permission == android.Manifest.permission.BIND_ACCESSIBILITY_SERVICE } == true
+            val hasDeviceAdmin = pkg.receivers?.any { it.permission == android.Manifest.permission.BIND_DEVICE_ADMIN } == true
+
             apps.add(
                 mapOf(
                     "name" to appName,
@@ -108,7 +131,10 @@ class MainActivity : FlutterActivity() {
                     "isSystem" to isSystem,
                     "versionName" to (pkg.versionName ?: ""),
                     "installer" to (installer ?: "unknown"),
-                    "targetSdk" to appInfo.targetSdkVersion
+                    "targetSdk" to appInfo.targetSdkVersion,
+                    "hasLauncher" to hasLauncher,
+                    "hasAccessibility" to hasAccessibility,
+                    "hasDeviceAdmin" to hasDeviceAdmin
                 )
             )
         }
@@ -135,6 +161,25 @@ class MainActivity : FlutterActivity() {
             val stream = java.io.ByteArrayOutputStream()
             bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
             stream.toByteArray()
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun getAppHash(packageName: String): String? {
+        return try {
+            val pm = packageManager
+            val appInfo = pm.getApplicationInfo(packageName, 0)
+            val file = java.io.File(appInfo.sourceDir)
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            val fis = java.io.FileInputStream(file)
+            val buffer = ByteArray(8192)
+            var numOfBytesRead: Int
+            while (fis.read(buffer).also { numOfBytesRead = it } > 0) {
+                md.update(buffer, 0, numOfBytesRead)
+            }
+            val hashBytes = md.digest()
+            hashBytes.joinToString("") { "%02x".format(it) }
         } catch (e: Exception) {
             null
         }

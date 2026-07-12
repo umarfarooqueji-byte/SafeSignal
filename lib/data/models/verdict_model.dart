@@ -72,6 +72,24 @@ class VerdictModel extends HiveObject {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'check_id': checkId,
+      'verdict': verdict,
+      'confidence': confidence,
+      'scamType': scamType,
+      'riskLevel': 'HIGH', // fallback or add to model if needed
+      'escalated': escalated,
+      'why': why,
+      'what_to_do': whatToDo,
+      'trend_note': trendNote,
+      'language': language,
+      'disclaimer': disclaimer,
+      'inputText': inputText,
+      'checked_at': checkedAt.toIso8601String(),
+    };
+  }
+
   // Mock verdicts for development
   static VerdictModel mockScam() => VerdictModel(
         checkId: 'mock_scam_001',

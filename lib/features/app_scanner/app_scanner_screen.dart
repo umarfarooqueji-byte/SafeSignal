@@ -3,7 +3,9 @@ import '../../core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/widgets/arc_gauge.dart';
-
+import '../../core/services/supabase_service.dart';
+import 'package:dio/dio.dart';
+import '../../core/constants.dart';
 class AppScannerScreen extends StatefulWidget {
   const AppScannerScreen({super.key});
 
@@ -66,6 +68,22 @@ class _AppScannerScreenState extends State<AppScannerScreen>
 
       analyzed.sort((a, b) => b.riskScore.compareTo(a.riskScore));
 
+      // Save to Supabase
+      try {
+        final riskyCount = analyzed.where((a) => a.riskLevel == RiskLevel.high || a.riskLevel == RiskLevel.critical).length;
+        await SupabaseService().saveScanHistory(
+          scanType: 'APP_SCAN',
+          target: '${analyzed.length} Apps',
+          status: riskyCount > 0 ? 'WARNING' : 'SAFE',
+          details: {
+            'totalApps': analyzed.length,
+            'riskyApps': riskyCount,
+          },
+        );
+      } catch (e) {
+        debugPrint('Supabase save error: $e');
+      }
+
       setState(() {
         _allApps = analyzed;
         _phase = _Phase.done;
@@ -112,8 +130,6 @@ class _AppScannerScreenState extends State<AppScannerScreen>
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFFF8F9FB);
-    const textColor = Color(0xFF1E293B);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -504,6 +520,8 @@ class _AppCardState extends State<_AppCard> {
   bool _expanded = false;
   Uint8List? _iconBytes;
   bool _iconLoaded = false;
+  bool _vtScanning = false;
+  String? _vtResult;
 
   @override
   void initState() {
@@ -527,6 +545,74 @@ class _AppCardState extends State<_AppCard> {
           _iconLoaded = true;
         });
       }
+    }
+  }
+
+  Future<void> _verifyWithVirusTotal() async {
+    if (AppConstants.virusTotalApiKey.isEmpty) {
+      setState(() => _vtResult = 'VirusTotal API key missing!');
+      return;
+    }
+    setState(() {
+      _vtScanning = true;
+      _vtResult = null;
+    });
+
+    try {
+      final hash = await const MethodChannel('com.safesignal/app_scanner')
+          .invokeMethod<String>('getAppHash', {'package': widget.app.package});
+      
+      if (hash == null || hash.isEmpty) {
+        setState(() {
+          _vtScanning = false;
+          _vtResult = 'Could not compute APK hash.';
+        });
+        return;
+      }
+
+      final response = await Dio().get(
+        'https://www.virustotal.com/api/v3/files/$hash',
+        options: Options(
+          headers: {'x-apikey': AppConstants.virusTotalApiKey},
+          receiveTimeout: const Duration(seconds: 10),
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final stats = response.data['data']['attributes']['last_analysis_stats'];
+        final malicious = stats['malicious'] as int? ?? 0;
+        final suspicious = stats['suspicious'] as int? ?? 0;
+        
+        setState(() {
+          _vtScanning = false;
+          if (malicious > 0) {
+            _vtResult = 'DANGER: $malicious engines detected malware!';
+          } else if (suspicious > 0) {
+            _vtResult = 'Warning: $suspicious engines flagged as suspicious.';
+          } else {
+            _vtResult = 'Safe: 0 engines detected threats.';
+          }
+        });
+      } else {
+        setState(() {
+          _vtScanning = false;
+          _vtResult = 'App not found in VirusTotal database.';
+        });
+      }
+    } on DioException catch (e) {
+      setState(() {
+        _vtScanning = false;
+        if (e.response?.statusCode == 404) {
+          _vtResult = 'App not found in VirusTotal database (likely safe).';
+        } else {
+          _vtResult = 'API Error: Rate limited or unavailable.';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _vtScanning = false;
+        _vtResult = 'Error verifying with VirusTotal.';
+      });
     }
   }
 
@@ -766,6 +852,39 @@ class _AppCardState extends State<_AppCard> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 12),
+                    if (app.riskLevel != RiskLevel.safe || app.installer != 'com.android.vending')
+                      InkWell(
+                        onTap: _vtScanning ? null : _verifyWithVirusTotal,
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: rc.withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.security_rounded, color: rc, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _vtScanning 
+                                      ? 'Scanning with VirusTotal...' 
+                                      : (_vtResult ?? 'Verify with VirusTotal API'),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: rc,
+                                  ),
+                                ),
+                              ),
+                              if (_vtScanning)
+                                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: rc)),
+                            ],
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -784,6 +903,9 @@ class AppInfo {
   final int targetSdk;
   final List<String> permissions;
   final bool isSystem;
+  final bool hasLauncher;
+  final bool hasAccessibility;
+  final bool hasDeviceAdmin;
   final int riskScore; // 0-100 (100 = bad)
   final RiskLevel riskLevel;
   final List<String> riskReasons;
@@ -792,6 +914,7 @@ class AppInfo {
     required this.name, required this.package, required this.version,
     required this.installer, required this.targetSdk,
     required this.permissions, required this.isSystem,
+    required this.hasLauncher, required this.hasAccessibility, required this.hasDeviceAdmin,
     required this.riskScore, required this.riskLevel, required this.riskReasons,
   });
 
@@ -833,6 +956,9 @@ class RiskEngine {
     final version = raw['versionName'] as String? ?? '';
     final installer = raw['installer'] as String? ?? 'unknown';
     final targetSdk = raw['targetSdk'] as int? ?? 33; // Default modern if missing
+    final hasLauncher = raw['hasLauncher'] as bool? ?? true;
+    final hasAccessibility = raw['hasAccessibility'] as bool? ?? false;
+    final hasDeviceAdmin = raw['hasDeviceAdmin'] as bool? ?? false;
 
     int score = 0;
     final reasons = <String>[];
@@ -852,6 +978,21 @@ class RiskEngine {
       if (targetSdk < 28) { // Android 9 (Pie)
         score += 15;
         reasons.add('Outdated SDK (Target: $targetSdk): Bypasses modern Android security protections.');
+      }
+
+      if (!hasLauncher) {
+        score += 40;
+        reasons.insert(0, 'CRITICAL (Spyware): App is hiding its icon from your app drawer.');
+      }
+
+      if (hasAccessibility) {
+        score += 40;
+        reasons.insert(0, 'CRITICAL (Control): Has Accessibility Service (can read your screen & tap buttons).');
+      }
+
+      if (hasDeviceAdmin) {
+        score += 40;
+        reasons.insert(0, 'CRITICAL (Admin): Requests Device Admin rights (can lock device or wipe data).');
       }
 
       for (final perm in perms) {
@@ -919,6 +1060,7 @@ class RiskEngine {
       name: name, package: pkg, version: version, 
       installer: installer, targetSdk: targetSdk,
       permissions: perms, isSystem: isSystem, 
+      hasLauncher: hasLauncher, hasAccessibility: hasAccessibility, hasDeviceAdmin: hasDeviceAdmin,
       riskScore: score, riskLevel: level,
       riskReasons: reasons,
     );

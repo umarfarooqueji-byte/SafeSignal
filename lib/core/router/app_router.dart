@@ -21,8 +21,12 @@ import '../../features/upi_scanner/upi_scanner_screen.dart';
 import '../../features/device_audit/device_audit_screen.dart';
 import '../../features/email_breach/email_breach_screen.dart';
 import '../../features/chat/chat_screen.dart';
+import '../../features/qr_scanner/qr_scanner_screen.dart';
+import '../../features/clipboard/clipboard_guard_screen.dart';
+import '../../features/vault/vault_screen.dart';
+import '../../features/vault/vault_lock_screen.dart';
 import '../../data/models/verdict_model.dart';
-import '../constants.dart';
+
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -89,6 +93,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/email-breach',
         builder: (context, state) => const EmailBreachScreen(),
+      ),
+      GoRoute(
+        path: '/qr-scanner',
+        builder: (context, state) => const QrScannerScreen(),
+      ),
+      GoRoute(
+        path: '/clipboard',
+        builder: (context, state) => const ClipboardGuardScreen(),
+      ),
+      GoRoute(
+        path: '/vault',
+        builder: (context, state) => const VaultScreen(),
+      ),
+      GoRoute(
+        path: '/vault-lock',
+        builder: (context, state) => const VaultLockScreen(),
       ),
       GoRoute(
         path: '/verdict',
@@ -158,23 +178,23 @@ class _SplashRedirectScreenState extends State<SplashRedirectScreen>
     await Future.delayed(const Duration(milliseconds: 2800));
     if (!mounted) return;
     final prefs = await SharedPreferences.getInstance();
-    final onboardingDone = prefs.getBool(AppConstants.prefOnboardingDone) ?? false;
-    if (!mounted) return;
-    if (onboardingDone) {
-      // Check if logged in (for now using a simple pref 'isLoggedIn')
-      final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-      final isProfileSetupDone = prefs.getBool('isProfileSetupDone') ?? false;
-      if (isLoggedIn) {
-        if (isProfileSetupDone) {
-          context.go('/home');
+    
+    final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+    final isProfileSetupDone = prefs.getBool('isProfileSetupDone') ?? false;
+    
+    if (isLoggedIn) {
+      if (isProfileSetupDone) {
+        final isVaultEnabled = prefs.getBool('isVaultEnabled') ?? false;
+        if (isVaultEnabled) {
+          context.go('/vault-lock');
         } else {
-          context.go('/profile-setup');
+          context.go('/home');
         }
       } else {
-        context.go('/signin');
+        context.go('/profile-setup');
       }
     } else {
-      context.go('/onboarding');
+      context.go('/signin');
     }
   }
 

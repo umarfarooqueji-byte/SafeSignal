@@ -33,6 +33,7 @@
     <!-- Overlay — show call screening popup on top of incoming call UI -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
 
     <application
@@ -88,6 +89,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- Persistent Background Service -->
+        <service
+            android:name=".SafeSignalService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+
         <!-- Email / Notification Scanner Service -->
         <service
             android:name=".EmailNotificationService"
@@ -100,6 +107,19 @@
             <meta-data
                 android:name="android.service.notification.default_filter_types"
                 android:value="conversations,alerting" />
+        </service>
+
+        <!-- Live Link Shield (Accessibility Service) -->
+        <service
+            android:name=".LinkShieldAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
         </service>
 
         <meta-data

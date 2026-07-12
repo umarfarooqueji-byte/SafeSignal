@@ -38,11 +38,17 @@ class _SmsInboxScreenState extends State<SmsInboxScreen>
 
   Future<void> _loadSms() async {
     final prefs = await SharedPreferences.getInstance();
-    final jsonList = prefs.getStringList('sms_inbox') ?? [];
-    final records = jsonList.map((s) {
+    final jsonString = prefs.getString('sms_inbox');
+    List<dynamic> jsonList = [];
+    if (jsonString != null) {
       try {
-        final m = json.decode(s) as Map<String, dynamic>;
-        return SmsRecord.fromJson(m);
+        jsonList = json.decode(jsonString) as List<dynamic>;
+      } catch (_) {}
+    }
+    
+    final records = jsonList.map((m) {
+      try {
+        return SmsRecord.fromJson(m as Map<String, dynamic>);
       } catch (_) {
         return null;
       }

@@ -5,8 +5,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:installed_apps/installed_apps.dart';
 import 'package:installed_apps/app_info.dart';
-import 'dart:io';
 
+import '../../core/services/supabase_service.dart';
 // ─── Data Model ────────────────────────────────────────────────────────────────
 class _AuditResult {
   final AndroidDeviceInfo? deviceInfo;
@@ -114,32 +114,32 @@ class _DeviceAuditScreenState extends State<DeviceAuditScreen>
       // Stage 6 — Permission audit
       _updateStage(5, 78);
       final riskyApps = allApps.where((app) {
-        final pkgLower = (app.packageName ?? '').toLowerCase();
-        final nameLower = (app.name ?? '').toLowerCase();
+        final pkgLower = app.packageName.toLowerCase();
+        final nameLower = app.name.toLowerCase();
         return _riskyKeywords.any((k) => pkgLower.contains(k) || nameLower.contains(k));
       }).take(10).toList();
 
       final cameraApps = allApps.where((app) {
-        final p = (app.packageName ?? '').toLowerCase();
-        final n = (app.name ?? '').toLowerCase();
+        final p = app.packageName.toLowerCase();
+        final n = app.name.toLowerCase();
         return _cameraApps.any((k) => p.contains(k) || n.contains(k));
       }).take(6).toList();
 
       final smsApps = allApps.where((app) {
-        final p = (app.packageName ?? '').toLowerCase();
-        final n = (app.name ?? '').toLowerCase();
+        final p = app.packageName.toLowerCase();
+        final n = app.name.toLowerCase();
         return _smsApps.any((k) => p.contains(k) || n.contains(k));
       }).take(6).toList();
 
       final contactApps = allApps.where((app) {
-        final p = (app.packageName ?? '').toLowerCase();
-        final n = (app.name ?? '').toLowerCase();
+        final p = app.packageName.toLowerCase();
+        final n = app.name.toLowerCase();
         return _contactApps.any((k) => p.contains(k) || n.contains(k));
       }).take(6).toList();
 
       final micApps = allApps.where((app) {
-        final p = (app.packageName ?? '').toLowerCase();
-        final n = (app.name ?? '').toLowerCase();
+        final p = app.packageName.toLowerCase();
+        final n = app.name.toLowerCase();
         return _micApps.any((k) => p.contains(k) || n.contains(k));
       }).take(6).toList();
 
@@ -163,6 +163,22 @@ class _DeviceAuditScreenState extends State<DeviceAuditScreen>
         },
         developerOptionsEnabled: devOptionsEnabled,
       );
+
+      // Save to Supabase
+      try {
+        await SupabaseService().saveScanHistory(
+          scanType: 'DEVICE_AUDIT',
+          target: deviceInfo?.model ?? 'Android Device',
+          status: (riskyApps.isNotEmpty || devOptionsEnabled) ? 'WARNING' : 'SAFE',
+          details: {
+            'riskyAppsCount': riskyApps.length,
+            'developerOptions': devOptionsEnabled,
+            'totalApps': allApps.length,
+          },
+        );
+      } catch (e) {
+        debugPrint('Supabase save error: $e');
+      }
 
       if (mounted) {
         setState(() {
@@ -834,7 +850,7 @@ class _RealAppChip extends StatelessWidget {
             const Icon(Icons.android_rounded, size: 14, color: Colors.red),
           const SizedBox(width: 4),
           Text(
-            (app.name ?? 'App').length > 12 ? '${(app.name ?? 'App').substring(0, 12)}…' : (app.name ?? 'App'),
+            app.name.length > 12 ? '${app.name.substring(0, 12)}…' : app.name,
             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.red),
           ),
         ],

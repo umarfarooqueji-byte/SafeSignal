@@ -215,46 +215,65 @@ class CallReceiver : BroadcastReceiver() {
                 val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
                 windowManager = wm
 
-                // Build overlay view programmatically
+                // Base Container
                 val container = LinearLayout(context).apply {
                     orientation = LinearLayout.VERTICAL
-                    setPadding(40, 32, 40, 32)
-                    setBackgroundColor(Color.parseColor("#CC000000"))
-                    elevation = 24f
+                    setPadding(48, 48, 48, 48)
+                    
+                    // Premium Background with Gradient and Rounded Corners
+                    val bgDrawable = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                        cornerRadius = 48f
+                        colors = intArrayOf(Color.parseColor("#1E2128"), Color.parseColor("#121418"))
+                        setStroke(2, Color.parseColor("#33FFFFFF"))
+                    }
+                    background = bgDrawable
+                    elevation = 30f
                 }
 
-                // Brand header
+                // Brand header (SafeSignal)
                 val brandRow = LinearLayout(context).apply {
                     orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
                 }
-                val shieldIcon = TextView(context).apply {
+                val brandIcon = TextView(context).apply {
                     text = "🛡️"
-                    textSize = 20f
-                    setPadding(0, 0, 12, 0)
+                    textSize = 18f
+                    setPadding(0, 0, 16, 0)
                 }
                 val brandText = TextView(context).apply {
-                    text = "SafeSignal"
-                    setTextColor(Color.WHITE)
-                    textSize = 14f
+                    text = "SafeSignal AI Shield"
+                    setTextColor(Color.parseColor("#4CAF50"))
+                    textSize = 15f
                     setTypeface(null, android.graphics.Typeface.BOLD)
                 }
-                brandRow.addView(shieldIcon)
+                brandRow.addView(brandIcon)
                 brandRow.addView(brandText)
+
+                // Divider Line
+                val divider = View(context).apply {
+                    val params = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2)
+                    params.setMargins(0, 24, 0, 24)
+                    layoutParams = params
+                    setBackgroundColor(Color.parseColor("#2A2E35"))
+                }
 
                 // Incoming call label
                 val incomingLabel = TextView(context).apply {
-                    text = "Incoming Call"
-                    setTextColor(Color.parseColor("#90FFFFFF"))
-                    textSize = 12f
-                    setPadding(0, 16, 0, 4)
+                    text = "INCOMING CALL ANALYSIS"
+                    setTextColor(Color.parseColor("#8892B0"))
+                    textSize = 11f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    letterSpacing = 0.05f
                 }
 
                 // Phone number or Contact Name
                 val numberText = TextView(context).apply {
                     text = analysis.displayName ?: phoneNumber
                     setTextColor(Color.WHITE)
-                    textSize = 22f
+                    textSize = 28f
                     setTypeface(null, android.graphics.Typeface.BOLD)
+                    setPadding(0, 8, 0, 0)
                 }
                 
                 // If it's a known contact, also show the phone number small underneath
@@ -262,44 +281,77 @@ class CallReceiver : BroadcastReceiver() {
                 if (analysis.displayName != null) {
                     subNumberText = TextView(context).apply {
                         text = phoneNumber
-                        setTextColor(Color.parseColor("#A0FFFFFF"))
-                        textSize = 12f
-                        setPadding(0, 0, 0, 8)
+                        setTextColor(Color.parseColor("#8892B0"))
+                        textSize = 14f
+                        setPadding(0, 4, 0, 8)
                     }
                 }
 
-                // Verdict badge
+                // Verdict badge container
+                val badgeContainer = LinearLayout(context).apply {
+                    setPadding(0, 32, 0, 16)
+                    gravity = Gravity.LEFT
+                }
+                
                 val verdictBadge = TextView(context).apply {
                     text = "${analysis.emoji}  ${analysis.verdict}"
                     setTextColor(analysis.textColor)
-                    setBackgroundColor(analysis.bgColor)
-                    textSize = 14f
+                    textSize = 16f
                     setTypeface(null, android.graphics.Typeface.BOLD)
-                    setPadding(28, 12, 28, 12)
+                    setPadding(40, 20, 40, 20)
+                    
+                    val badgeBg = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                        cornerRadius = 100f
+                        setColor(analysis.bgColor)
+                        setStroke(2, Color.parseColor("#50FFFFFF"))
+                    }
+                    background = badgeBg
                 }
-                
-                // Wrapper for badge to allow margins if needed
-                val badgeWrapper = LinearLayout(context).apply {
-                    setPadding(0, 12, 0, 0)
-                    addView(verdictBadge)
-                }
+                badgeContainer.addView(verdictBadge)
 
-                // Reason
+                // Reason / Detail text
                 val reasonText = TextView(context).apply {
                     text = analysis.reason
-                    setTextColor(Color.parseColor("#CCFFFFFF"))
-                    textSize = 12f
-                    setPadding(0, 12, 0, 0)
+                    setTextColor(Color.parseColor("#CCD6F6"))
+                    textSize = 14f
+                    setPadding(0, 8, 0, 0)
+                    setLineSpacing(4f, 1f)
                 }
+                
+                // Confidence Bar (visual indicator)
+                val confContainer = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setPadding(0, 32, 0, 0)
+                    gravity = Gravity.CENTER_VERTICAL
+                }
+                val confLabel = TextView(context).apply {
+                    text = "AI Confidence: ${analysis.confidence}%"
+                    setTextColor(Color.parseColor("#8892B0"))
+                    textSize = 12f
+                }
+                confContainer.addView(confLabel)
 
+                // Add views to main container
                 container.addView(brandRow)
+                container.addView(divider)
                 container.addView(incomingLabel)
                 container.addView(numberText)
                 if (subNumberText != null) {
                     container.addView(subNumberText)
                 }
-                container.addView(badgeWrapper)
+                container.addView(badgeContainer)
                 container.addView(reasonText)
+                container.addView(confContainer)
+
+                // Outer Wrapper for Margin
+                val wrapper = LinearLayout(context).apply {
+                    setPadding(40, 80, 40, 40)
+                    addView(container, LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ))
+                }
 
                 val params = WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT,
@@ -314,16 +366,16 @@ class CallReceiver : BroadcastReceiver() {
                     PixelFormat.TRANSLUCENT
                 ).apply {
                     gravity = Gravity.TOP
-                    y = 80
+                    y = 50
                 }
 
-                wm.addView(container, params)
-                overlayView = container
+                wm.addView(wrapper, params)
+                overlayView = wrapper
 
                 // Auto-dismiss after 12 seconds
                 Handler(Looper.getMainLooper()).postDelayed({ dismissOverlay() }, 12000)
             } catch (e: Exception) {
-                // Silently fail — overlay is a nice-to-have
+                e.printStackTrace()
             }
         }
     }

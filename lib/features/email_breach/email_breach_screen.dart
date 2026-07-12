@@ -22,7 +22,19 @@ class _EmailBreachScreenState extends State<EmailBreachScreen> {
 
   Future<void> _startScan() async {
     final email = _emailCtrl.text.trim();
-    if (email.isEmpty || !email.contains('@')) return;
+    if (email.isEmpty) return;
+
+    final emailPattern = r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$';
+    if (!RegExp(emailPattern).hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text("Are deva! Ye kaisa email address hai? Lagta hai keyboard pe so gaye the. Sahi email dalo yaar! 🤪"),
+          backgroundColor: Colors.red.shade800,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
     FocusScope.of(context).unfocus();
     setState(() {
@@ -100,8 +112,42 @@ class _EmailBreachScreenState extends State<EmailBreachScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF06090F) : const Color(0xFFEBF3FA); // Light blue tint matching app theme
+    final bg = isDark ? const Color(0xFF06090F) : const Color(0xFFEBF3FA); // Keep original background colors
     final textColor = isDark ? Colors.white : const Color(0xFF1E293B);
+    
+    // Determine gauge score and status text based on breaches
+    double gaugeScore = 0;
+    String statusText = '';
+    Color statusColor = Colors.transparent;
+
+    if (_phase == _Phase.done) {
+      if (_breaches.isEmpty) {
+        statusText = 'Safe';
+        statusColor = const Color(0xFF4CAF50);
+      } else {
+        // Calculate score
+        int score = 0;
+        for (var b in _breaches) {
+          if (b.dataClasses.contains('Passwords')) score += 40;
+          if (b.dataClasses.contains('Email addresses')) score += 10;
+          if (b.dataClasses.contains('Phone numbers')) score += 20;
+          if (b.dataClasses.contains('Physical addresses')) score += 20;
+        }
+        score = score.clamp(0, 100);
+        gaugeScore = score.toDouble();
+        
+        if (score >= 50) {
+          statusText = 'Unsafe';
+          statusColor = const Color(0xFFFF8A65); // Orange-red
+        } else {
+          statusText = 'Suspicious';
+          statusColor = const Color(0xFFFFB300);
+        }
+      }
+    } else if (_phase == _Phase.scanning) {
+      statusText = 'Scanning...';
+      statusColor = const Color(0xFF7C4DFF);
+    }
 
     return Scaffold(
       backgroundColor: bg,
@@ -109,65 +155,67 @@ class _EmailBreachScreenState extends State<EmailBreachScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, color: textColor, size: 22),
-          onPressed: () => Navigator.pop(context),
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16.0),
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: isDark ? Colors.white24 : Colors.black12, width: 1.5),
+            ),
+            child: IconButton(
+              icon: Icon(Icons.grid_view_rounded, color: isDark ? Colors.white54 : Colors.black54, size: 20),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
         ),
         title: Text(
-          'Email Guard',
+          'Email Analyzer',
           style: TextStyle(
-            fontWeight: FontWeight.w900,
-            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            fontSize: 24,
             color: textColor,
-            letterSpacing: -0.5,
+            fontFamily: 'serif', 
           ),
         ),
         centerTitle: true,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 16),
-              
-              // Top visual icon (shield/mail)
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF7C4DFF).withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(CupertinoIcons.mail_solid, size: 50, color: Color(0xFF7C4DFF)),
-              ).animate().scale(begin: const Offset(0.7, 0.7)).fadeIn(),
-              
-              const SizedBox(height: 16),
-              
+              const SizedBox(height: 20),
+              // Gauge
+              TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0, end: gaugeScore),
+                duration: const Duration(milliseconds: 1000),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, child) {
+                  return _EmailSpeedometerGauge(score: value);
+                },
+              ),
+              const SizedBox(height: 12),
+              // Status Text
               Text(
-                _phase == _Phase.idle 
-                  ? 'Check for Data Breaches' 
-                  : (_phase == _Phase.scanning ? 'Scanning Dark Web...' : 'Scan Complete'),
+                statusText,
                 style: TextStyle(
-                  color: textColor,
+                  color: statusColor,
                   fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'serif',
                 ),
-              ).animate(key: ValueKey(_phase)).fadeIn(),
+              ).animate(target: statusText.isNotEmpty ? 1 : 0).fadeIn(),
+              
+              const SizedBox(height: 32),
 
-              const SizedBox(height: 48),
-
-              // TextField mimicking Scan Link UI
+              // TextField mimicking the screenshot
               Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(
-                    color: _phase == _Phase.scanning 
-                        ? const Color(0xFF7C4DFF)
-                        : (isDark ? Colors.white24 : Colors.black12),
-                    width: 2,
+                    color: isDark ? Colors.white : Colors.black54,
+                    width: 1.2,
                   ),
                 ),
                 child: Stack(
@@ -176,12 +224,14 @@ class _EmailBreachScreenState extends State<EmailBreachScreen> {
                     TextField(
                       controller: _emailCtrl,
                       enabled: _phase != _Phase.scanning,
-                      keyboardType: TextInputType.emailAddress,
-                      style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w500),
+                      style: TextStyle(color: textColor, fontSize: 16),
                       decoration: InputDecoration(
-                        prefixIcon: Icon(CupertinoIcons.mail, color: isDark ? Colors.white54 : Colors.black54),
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                        suffixIcon: Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: Icon(Icons.search, color: isDark ? Colors.white : Colors.black87, size: 24),
+                        ),
                       ),
                       onSubmitted: (_) => _startScan(),
                     ),
@@ -190,13 +240,12 @@ class _EmailBreachScreenState extends State<EmailBreachScreen> {
                       top: -10,
                       child: Container(
                         color: bg,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
                         child: Text(
                           'Email',
                           style: TextStyle(
-                            color: isDark ? Colors.white70 : Colors.black54,
+                            color: isDark ? Colors.white70 : Colors.black87,
                             fontSize: 12,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -205,43 +254,46 @@ class _EmailBreachScreenState extends State<EmailBreachScreen> {
                 ),
               ),
               
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 16),
-                  child: Text(
-                    'Enter a valid email address.',
-                    style: TextStyle(
-                      color: isDark ? Colors.white54 : Colors.black54,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 32),
+              const SizedBox(height: 20),
 
               // Scan Button
-              SizedBox(
+              Container(
                 width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _phase == _Phase.scanning ? null : _startScan,
-                  icon: _phase == _Phase.scanning 
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(CupertinoIcons.search, color: Colors.white70),
-                  label: Text(
-                    _phase == _Phase.scanning ? 'Scanning...' : 'Check Email',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                height: 56,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(28),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF29B6F6), Color(0xFF0D47A1)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
                   ),
+                ),
+                child: ElevatedButton(
+                  onPressed: _phase == _Phase.scanning ? null : _startScan,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E293B),
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.grey.shade800,
-                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                      borderRadius: BorderRadius.circular(28),
                     ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const SizedBox(width: 24), // Balance for centering
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            _phase == _Phase.scanning ? 'Scanning...' : 'Scan Email',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                      _phase == _Phase.scanning 
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(CupertinoIcons.mail, color: Colors.white, size: 24),
+                      const SizedBox(width: 8),
+                    ],
                   ),
                 ),
               ).animate().fadeIn(delay: 150.ms),
@@ -258,11 +310,10 @@ class _EmailBreachScreenState extends State<EmailBreachScreen> {
                   ),
                 ),
 
-              if (_phase == _Phase.done)
-                Padding(
-                  padding: const EdgeInsets.only(top: 32),
-                  child: _buildResults(isDark),
-                ),
+              if (_phase == _Phase.done) ...[
+                const SizedBox(height: 24),
+                _buildAnalysisCards(isDark),
+              ],
             ],
           ),
         ),
@@ -270,181 +321,277 @@ class _EmailBreachScreenState extends State<EmailBreachScreen> {
     );
   }
 
-  Widget _buildResults(bool isDark) {
+  Widget _buildAnalysisCards(bool isDark) {
     if (_breaches.isEmpty) {
-      return Center(
+      return Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFF4CAF50), width: 1.5),
+        ),
+        padding: const EdgeInsets.all(24),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.check_circle_rounded, size: 80, color: Color(0xFF10B981)).animate().scale().fadeIn(),
-            const SizedBox(height: 20),
-            Text(
-              'No Breaches Found!',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black),
+            const Icon(Icons.check_circle_rounded, size: 60, color: Color(0xFF4CAF50)),
+            const SizedBox(height: 16),
+            const Text(
+              'No Breaches Found',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF4CAF50)),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
-              'Aapka email secure hai. Kisi leak mein nahi mila.',
-              style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+              _verdict.isEmpty ? 'Your email is secure and has not been found in any public leaks.' : _verdict,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 14, height: 1.4),
             ),
           ],
         ),
-      );
+      ).animate().fadeIn();
     }
 
+    // Determine values for cards
+    int score = 0;
+    bool passwordLeaked = false;
+    for (var b in _breaches) {
+      if (b.dataClasses.contains('Passwords')) {
+         score += 40;
+         passwordLeaked = true;
+      }
+      if (b.dataClasses.contains('Email addresses')) score += 10;
+      if (b.dataClasses.contains('Phone numbers')) score += 20;
+      if (b.dataClasses.contains('Physical addresses')) score += 20;
+    }
+    score = score.clamp(0, 100);
+
+    String siteGrade = score >= 50 ? 'E' : (score >= 20 ? 'C' : 'B');
+    String secScore = score > 50 ? '1' : (score > 20 ? '5' : '8');
+    
+    // Top leaked data
+    Set<String> allLeaked = {};
+    for (var b in _breaches) {
+      allLeaked.addAll(b.dataClasses);
+    }
+    String topLeaked = allLeaked.take(3).join(', ');
+    if (topLeaked.isEmpty) topLeaked = 'Unknown Data';
+
+    final outlineColor = const Color(0xFFFF8A65); // Coral/Orange outline
+    final cardStyle = BoxDecoration(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: outlineColor, width: 1.5),
+    );
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Breaches List
-        Text(
-          'FOUND IN ${_breaches.length} BREACHES',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
-            color: isDark ? Colors.white38 : Colors.black38,
-            letterSpacing: 2,
+        // Card 1: Risk Analysis
+        Container(
+          width: double.infinity,
+          decoration: cardStyle,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF5D1D05), // Dark reddish brown
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text('Risk Analysis', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+              ),
+              const SizedBox(height: 24),
+              Center(
+                child: Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.warning_amber_rounded, color: Color(0xFF6C63FF), size: 36),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              _buildRow('Security Grade', siteGrade, valueColor: outlineColor, isDark: isDark),
+              _divider(),
+              _buildRow('Security Score', secScore, valueColor: outlineColor, isDark: isDark),
+              _divider(),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 2, child: Text('Synopsis', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 15, fontWeight: FontWeight.bold))),
+                  Expanded(flex: 3, child: Text(_verdict.isEmpty ? 'Loading AI Analysis...' : _verdict, style: TextStyle(color: outlineColor, fontSize: 13, height: 1.4))),
+                ],
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 16),
-
-        ..._breaches.map((b) {
-          final hasPwd = b.dataClasses.contains('Passwords');
-          return Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF161B27) : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isDark ? const Color(0xFF30363D) : const Color(0xFFE2E8F0)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+        
+        // Card 2: Breach Details
+        Container(
+          width: double.infinity,
+          decoration: cardStyle,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF5D1D05), // Dark reddish brown
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ],
+                child: const Text('Breach Details', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+              ),
+              const SizedBox(height: 24),
+              _buildRow('Total Breaches', '${_breaches.length} Databases', valueColor: outlineColor, isDark: isDark),
+              _divider(),
+              _buildRow('Top Leaked Data', topLeaked, valueColor: outlineColor, isDark: isDark),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // Card 3: Suspected Fraud (If Dangerous)
+        if (passwordLeaked)
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xFF3E120A), // Dark red bg
+              borderRadius: BorderRadius.circular(24),
             ),
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            b.logoPath,
-                            errorBuilder: (c, e, s) => const Icon(Icons.business, color: Colors.grey),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              b.title,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 18,
-                                color: isDark ? Colors.white : Colors.black,
-                              ),
-                            ),
-                            Text(
-                              'Breached on ${b.breachDate}',
-                              style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (hasPwd)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
-                          ),
-                          child: const Text(
-                            'PWD LEAKED',
-                            style: TextStyle(color: Color(0xFFEF4444), fontSize: 10, fontWeight: FontWeight.w900),
-                          ),
-                        ),
-                    ],
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Action Required', style: TextStyle(color: Color(0xFFFF8A65), fontSize: 16, fontWeight: FontWeight.bold)),
+                    Icon(Icons.warning_rounded, color: const Color(0xFFFF8A65), size: 20),
+                  ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E2433) : const Color(0xFFF8FAFC),
-                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Compromised Data:',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: isDark ? Colors.white60 : Colors.black54,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: b.dataClasses.map((dc) {
-                          final isPwd = dc == 'Passwords';
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: isDark ? (isPwd ? const Color(0xFFEF4444).withValues(alpha: 0.1) : const Color(0xFF2A3347)) : (isPwd ? const Color(0xFFEF4444).withValues(alpha: 0.1) : Colors.white),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: isPwd ? const Color(0xFFEF4444).withValues(alpha: 0.3) : (isDark ? const Color(0xFF3B4457) : const Color(0xFFE2E8F0)),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  isPwd ? CupertinoIcons.lock_fill : CupertinoIcons.doc_text_fill,
-                                  size: 12,
-                                  color: isPwd ? const Color(0xFFEF4444) : (isDark ? Colors.white54 : Colors.black54),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  dc,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: isPwd ? const Color(0xFFEF4444) : (isDark ? Colors.white70 : Colors.black87),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Passwords were found in these breaches. Change your passwords immediately and enable Two-Factor Authentication.',
+                  style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
                 ),
               ],
             ),
-          ).animate().fadeIn(delay: 200.ms).slideX(begin: 0.05);
-        }),
+          ),
+        
+        const SizedBox(height: 30),
       ],
     );
+  }
+
+  Widget _buildRow(String label, String value, {required Color valueColor, required bool isDark}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(child: Text(label, style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 15, fontWeight: FontWeight.bold))),
+          Expanded(child: Text(value, textAlign: TextAlign.right, style: TextStyle(color: valueColor, fontSize: 15, fontWeight: FontWeight.bold))),
+        ],
+      ),
+    );
+  }
+
+  Widget _divider() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 12),
+      child: Divider(color: Colors.white24, height: 1, thickness: 1),
+    );
+  }
+}
+
+class _EmailSpeedometerGauge extends StatelessWidget {
+  final double score; // 0 to 100
+  const _EmailSpeedometerGauge({required this.score});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 240,
+      height: 140, // Height is roughly half of width + padding for the needle base
+      child: CustomPaint(
+        painter: _EmailSpeedometerPainter(score),
+      ),
+    );
+  }
+}
+
+class _EmailSpeedometerPainter extends CustomPainter {
+  final double score;
+
+  _EmailSpeedometerPainter(this.score);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height - 20);
+    final radius = size.width / 2;
+    
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 40
+      ..strokeCap = StrokeCap.butt;
+    
+    // Draw the 3 arcs (Green, Orange, Red)
+    final rect = Rect.fromCircle(center: center, radius: radius - 20);
+    
+    // Green (0 to 33)
+    paint.color = Colors.greenAccent.shade400;
+    canvas.drawArc(rect, 3.14159, 3.14159 / 3, false, paint);
+    
+    // Orange (33 to 66)
+    paint.color = Colors.orangeAccent.shade400;
+    canvas.drawArc(rect, 3.14159 + (3.14159 / 3), 3.14159 / 3, false, paint);
+    
+    // Red (66 to 100)
+    paint.color = Colors.redAccent.shade400;
+    canvas.drawArc(rect, 3.14159 + (2 * 3.14159 / 3), 3.14159 / 3, false, paint);
+    
+    // Draw needle
+    // Map score (0-100) to angle (Pi to 2*Pi)
+    double clampedScore = score.clamp(0.0, 100.0);
+    final angle = 3.14159 + (clampedScore / 100) * 3.14159;
+    
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(angle);
+    
+    final needlePaint = Paint()
+      ..color = const Color(0xFFE0E0E0) // Light grey
+      ..style = PaintingStyle.fill;
+    
+    // Draw needle triangle
+    final path = Path();
+    path.moveTo(0, -6);
+    path.lineTo(radius - 10, 0);
+    path.lineTo(0, 6);
+    path.close();
+    
+    // Add shadow
+    canvas.drawShadow(path, Colors.black, 4, true);
+    canvas.drawPath(path, needlePaint);
+    
+    // Draw center circle
+    canvas.drawCircle(const Offset(0, 0), 16, needlePaint);
+    final innerCirclePaint = Paint()..color = Colors.grey.shade400;
+    canvas.drawCircle(const Offset(0, 0), 10, innerCirclePaint);
+    
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _EmailSpeedometerPainter oldDelegate) {
+    return oldDelegate.score != score;
   }
 }
 
