@@ -120,7 +120,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   ),
                 ).animate(onPlay: (controller) => controller.repeat(reverse: true))
                  .scale(end: const Offset(1.2, 1.2), duration: 5.seconds, curve: Curves.easeInOut)
-                 .blur(end: 50),
+                 .blur(end: const Offset(50, 50)),
               ),
               Positioned(
                 bottom: -80,
@@ -134,7 +134,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   ),
                 ).animate(onPlay: (controller) => controller.repeat(reverse: true))
                  .scale(end: const Offset(1.3, 1.3), duration: 6.seconds, curve: Curves.easeInOut)
-                 .blur(end: 40),
+                 .blur(end: const Offset(40, 40)),
               ),
             ],
 
